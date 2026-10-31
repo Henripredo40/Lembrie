@@ -326,7 +326,7 @@ export default function App() {
 
   let conteúdo;
   if (tela === 'inicio') {
-    conteúdo = <TelaInicio perfil={perfil} objetos={objetos} eventos={eventos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} />;
+    conteúdo = <TelaInicio perfil={perfil} objetos={objetos} eventos={eventos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} />;
   } else if (tela === 'objetos') {
     conteúdo = <TelaObjetos objetos={objetos} definirObjetos={definirObjetos} api={chamarApi} categoriaInicial={categoriaInicial} notificar={notificar} />;
   } else if (tela === 'bluetooth') {

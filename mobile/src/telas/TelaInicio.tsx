@@ -1,5 +1,5 @@
 import estilos from '../estilos/TelaInicio.estilos';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView,  Text, TextInput, Pressable, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CartaoObjeto from '../componentes/CartaoObjeto';
@@ -9,9 +9,40 @@ import { cores, raios } from '../tema';
 import { categoriasDeObjeto, chaveiroEstáConectado, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
 import { formatarData } from '../utils/date';
 
-type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string } };
+type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string }; rotina?: boolean };
 
-export default function TelaInicio({ perfil, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas }) {
+export default function TelaInicio({ perfil, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva }) {
+  const [categoriasDaRotina, definirCategoriasDaRotina] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelado = false;
+    if (!rotinaAtiva || !objetos.length) {
+      definirCategoriasDaRotina([]);
+      return () => { cancelado = true; };
+    }
+
+    async function carregarCategoriasDaRotina() {
+      try {
+        const planos = await api('/routine/plans');
+        const destinos = [...new Set<string>((Array.isArray(planos) ? planos : []).map((plano) => String(plano.destination || '').trim()).filter((destino) => destino.length > 0))].slice(0, 5);
+        const recomendacoes = await Promise.all(destinos.map((destino) => api('/recommendations?destination=' + encodeURIComponent(destino)).catch(() => null)));
+        const categorias = new Set<string>();
+        recomendacoes.forEach((resposta) => {
+          (Array.isArray(resposta?.registeredItems) ? resposta.registeredItems : []).forEach((objeto) => {
+            const categoria = normalizarTexto(String(objeto.category || '').trim());
+            if (categoria) categorias.add(categoria);
+          });
+        });
+        if (!cancelado) definirCategoriasDaRotina([...categorias]);
+      } catch {
+        if (!cancelado) definirCategoriasDaRotina([]);
+      }
+    }
+
+    carregarCategoriasDaRotina();
+    return () => { cancelado = true; };
+  }, [api, objetos, rotinaAtiva]);
+
   const objetosEncontrados = useMemo(() => {
     const termo = normalizarTexto(busca.trim());
     if (!termo) return objetos;
@@ -23,17 +54,18 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
   const essenciais = objetos.filter(objetoÉEssencial).length;
   const nome = perfil?.name?.trim()?.split(/\s+/)[0] || 'Olá';
   const categoriasVisiveis = useMemo(() => {
-    const predefinidas: CategoriaComRepresentante[] = categoriasDeObjeto.slice(0, 8);
-    const todasPredefinidas = new Set(categoriasDeObjeto.map((categoria) => normalizarTexto(categoria.nome)));
-    const personalizadas: CategoriaComRepresentante[] = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter((categoria) => categoria.length > 0))]
-      .filter((categoria) => !todasPredefinidas.has(normalizarTexto(categoria)))
-      .map((categoria) => ({
-        nome: categoria,
-        ícone: 'tag-outline' as const,
-        objetoRepresentativo: objetos.find((objeto) => normalizarTexto(String(objeto.category || '')) === normalizarTexto(categoria)),
-      }));
-    return [...predefinidas, ...personalizadas];
-  }, [objetos]);
+    const nomes = [...new Set<string>(objetos.map((objeto) => String(objeto.category || 'Outros').trim()).filter((categoria) => categoria.length > 0))];
+    return nomes.map((nomeCategoria) => {
+      const predefinida = categoriasDeObjeto.find((categoria) => normalizarTexto(categoria.nome) === normalizarTexto(nomeCategoria));
+      const representativo = objetos.find((objeto) => normalizarTexto(String(objeto.category || 'Outros')) === normalizarTexto(nomeCategoria));
+      return {
+        nome: predefinida?.nome || nomeCategoria,
+        ícone: predefinida?.ícone || 'tag-outline',
+        objetoRepresentativo: predefinida ? undefined : representativo,
+        rotina: categoriasDaRotina.includes(normalizarTexto(nomeCategoria)),
+      };
+    }).sort((a, b) => Number(Boolean(b.rotina)) - Number(Boolean(a.rotina)));
+  }, [objetos, categoriasDaRotina]);
 
   return (
     <ScrollView
@@ -102,10 +134,12 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
               <View style={estilos.iconeCategoria}>{categoria.objetoRepresentativo ? <ImagemObjeto nome={categoria.objetoRepresentativo.name} categoria={categoria.objetoRepresentativo.category} tamanho={12} compacto /> : <MaterialCommunityIcons name={categoria.ícone} size={20} color={cores.primario} />}</View>
               <Text style={estilos.nomeCategoria}>{categoria.nome}</Text>
               <Text style={estilos.quantidadeCategoria}>{quantidade} {quantidade === 1 ? 'item' : 'itens'}</Text>
+              {categoria.rotina ? <Text style={estilos.rotuloRotinaCategoria}>Para sua rotina</Text> : null}
             </Pressable>
           );
         })}
       </View>
+      {categoriasVisiveis.length === 0 ? <Text style={estilos.semCategorias}>Cadastre um objeto para ver suas categorias.</Text> : null}
 
       <TituloSecao título={busca ? 'RESULTADOS' : 'SEUS OBJETOS'} ação={objetos.length ? 'Ver todos' : undefined} aoPressionar={() => abrirTela('objetos')} />
       {objetosEncontrados.length === 0 ? (
