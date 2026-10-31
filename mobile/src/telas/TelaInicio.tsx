@@ -56,8 +56,8 @@ export default function TelaInicio({ perfil, seguranca, objetos, eventos, busca,
   const sessaoRecente = seguranca?.sessions?.[0];
   const ultimoAcesso = seguranca?.last_login ? new Date(String(seguranca.last_login).replace(' ', 'T')) : null;
   const textoUltimoAcesso = ultimoAcesso && !Number.isNaN(ultimoAcesso.getTime())
-    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(ultimoAcesso)
-    : 'Ainda não há um acesso registrado';
+    ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(ultimoAcesso)
+    : 'Aguardando registro do acesso';
   const categoriasVisiveis = useMemo(() => {
     const nomes = [...new Set<string>(objetos.map((objeto) => String(objeto.category || 'Outros').trim()).filter((categoria) => categoria.length > 0))];
     return nomes.map((nomeCategoria) => {
@@ -89,13 +89,12 @@ export default function TelaInicio({ perfil, seguranca, objetos, eventos, busca,
       </View>
 
       <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes do último login" onPress={() => abrirTela('perfil')} style={estilos.cartaoUltimoAcesso}>
-        <View style={estilos.iconeUltimoAcesso}><Ionicons name="shield-checkmark-outline" size={20} color={cores.primario} /></View>
+        <View style={estilos.iconeUltimoAcesso}><Ionicons name="shield-checkmark" size={18} color={cores.primario} /></View>
         <View style={estilos.detalheUltimoAcesso}>
-          <Text style={estilos.rotuloUltimoAcesso}>ÚLTIMO LOGIN</Text>
-          <Text style={estilos.dataUltimoAcesso}>{textoUltimoAcesso}</Text>
-          {sessaoRecente?.device_label ? <Text style={estilos.dispositivoUltimoAcesso}>{sessaoRecente.device_label}{sessaoRecente.location_label ? ' · ' + sessaoRecente.location_label : ''}</Text> : null}
+          <View style={estilos.linhaUltimoAcesso}><Text style={estilos.rotuloUltimoAcesso}>ÚLTIMO LOGIN</Text><Text style={estilos.dataUltimoAcesso}>{textoUltimoAcesso}</Text></View>
+          {sessaoRecente?.device_label ? <Text numberOfLines={1} ellipsizeMode="tail" style={estilos.dispositivoUltimoAcesso}>{sessaoRecente.device_label}{sessaoRecente.location_label ? ' · ' + sessaoRecente.location_label : ''}</Text> : <Text style={estilos.dispositivoUltimoAcesso}>Toque para ver o histórico de segurança</Text>}
         </View>
-        <View style={estilos.atalhoUltimoAcesso}><Text style={estilos.textoAtalhoUltimoAcesso}>Detalhes</Text><Ionicons name="chevron-forward" size={16} color={cores.primario} /></View>
+        <View style={estilos.atalhoUltimoAcesso}><Ionicons name="chevron-forward" size={17} color={cores.primario} /></View>
       </Pressable>
 
       {erroConexao ? <Aviso ícone="cloud-offline-outline" tom="alerta" texto={erroConexao} /> : null}
