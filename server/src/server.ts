@@ -1583,28 +1583,36 @@ app.get('/places/reverse', auth, async (q, r) => {
 
   try {
     const local = await (filaLugares = filaLugares.catch(() => {}).then(async () => {
-      const wait = Math.max(0, 1100 - (Date.now() - ultimoPedidoDeMapa));
-      if (wait) await new Promise(resolve => setTimeout(resolve, wait));
-      ultimoPedidoDeMapa = Date.now();
-      const url = new URL('https://nominatim.openstreetmap.org/reverse');
-      url.search = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: 'jsonv2', zoom: '18', addressdetails: '1' }).toString();
-      const response = await fetch(url, {
-        headers: {
-          'Accept-Language': 'pt-BR,pt;q=0.9',
-          'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)',
-          'Referer': 'https://lembre-web.onrender.com/'
-        },
-        signal: AbortSignal.timeout(12000)
-      });
-      if (!response.ok) throw new Error('Busca de endereços temporariamente indisponível.');
-      const data = await response.json();
-      if (!data.display_name) throw new Error('Não encontrei um endereço neste ponto do mapa. Tente marcar uma rua próxima.');
-      return {
-        ...formatarResultadoLugar(data),
-        id: `coord:${latitude.toFixed(5)},${longitude.toFixed(5)}`,
-        latitude,
-        longitude,
-      };
+      // A very detailed reverse lookup can miss points between mapped
+      // buildings. Retry at broader scales, respecting Nominatim's 1 req/s rule.
+      for (const zoom of [18, 16, 14]) {
+        const wait = Math.max(0, 1100 - (Date.now() - ultimoPedidoDeMapa));
+        if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+        ultimoPedidoDeMapa = Date.now();
+        const url = new URL('https://nominatim.openstreetmap.org/reverse');
+        url.search = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: 'jsonv2', zoom: String(zoom), addressdetails: '1' }).toString();
+        const response = await fetch(url, {
+          headers: {
+            'Accept-Language': 'pt-BR,pt;q=0.9',
+            'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)',
+            'Referer': 'https://lembre-web.onrender.com/'
+          },
+          signal: AbortSignal.timeout(12000)
+        });
+        if (!response.ok) {
+          if (response.status === 404) continue;
+          throw new Error('Busca de endereços temporariamente indisponível.');
+        }
+        const data = await response.json();
+        if (!data.display_name) continue;
+        return {
+          ...formatarResultadoLugar(data),
+          id: `coord:${latitude.toFixed(5)},${longitude.toFixed(5)}`,
+          latitude,
+          longitude,
+        };
+      }
+      throw new Error('Não encontrei um endereço próximo deste ponto. Tente marcar uma rua mais próxima.');
     }));
     cacheLugares.set(cacheKey, { places: local, expires: Date.now() + 60 * 60 * 1000 });
     r.json(local);

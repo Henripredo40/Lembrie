@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +25,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
   const [buscando, definirBuscando] = useState(false);
   const [salvando, definirSalvando] = useState(false);
   const [erro, definirErro] = useState('');
+  const buscaPontoAtual = useRef(0);
   const destinosFrequentes = useMemo(() => {
     const resumo = new Map();
     planos.forEach(plano => resumo.set(plano.destination, (resumo.get(plano.destination) || 0) + 1));
@@ -37,6 +38,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
   }, [rotinaAtiva]);
 
   async function buscarLocal() {
+    buscaPontoAtual.current += 1;
     if (consulta.trim().length < 3) return definirErro('Digite pelo menos 3 caracteres para buscar um local.');
     definirErro('');
     definirLocais([]);
@@ -53,6 +55,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
   }
 
   async function buscarPorCep() {
+    buscaPontoAtual.current += 1;
     const cep = cepBusca.replace(/\D/g, '');
     if (cep.length !== 8) return definirErro('Digite os 8 números do CEP.');
     definirErro('');
@@ -88,6 +91,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
   }
 
   async function escolherLocal(local) {
+    buscaPontoAtual.current += 1;
     definirSelecionado(local);
     definirLocais([]);
     definirCepsDoEndereco(local.cep ? [{ cep: local.cep, bairro: local.bairro || '' }] : []);
@@ -108,10 +112,11 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     await carregarItensDoDestino(local.nome);
   }
 
-  async function carregarItensDoDestino(nomeDestino) {
+  async function carregarItensDoDestino(nomeDestino, idBusca?) {
     definirResultadoConferencia(null);
     try {
       const dados = await api('/recommendations?destination=' + encodeURIComponent(nomeDestino));
+      if (idBusca !== undefined && idBusca !== buscaPontoAtual.current) return;
       const todos = Array.isArray(dados.allRegisteredItems) ? dados.allRegisteredItems : [];
       const relacionados = Array.isArray(dados.registeredItems) ? dados.registeredItems : [];
       definirSugestoes(Array.isArray(dados.items) ? dados.items : []);
@@ -119,6 +124,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       definirObjetosCadastrados(todos);
       definirObjetosSelecionados(relacionados.map(item => String(item.id)));
     } catch (falha) {
+      if (idBusca !== undefined && idBusca !== buscaPontoAtual.current) return;
       definirSugestoes([]);
       definirObjetosSugeridos([]);
       definirObjetosCadastrados([]);
@@ -161,6 +167,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
   }
 
   async function localizarAgora() {
+    buscaPontoAtual.current += 1;
     definirErro('');
     try {
       const permissão = await Location.requestForegroundPermissionsAsync();
@@ -211,10 +218,11 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       definirErro('Não consegui ler o ponto marcado. Toque novamente em uma área visível do mapa.');
       return;
     }
+    const idBusca = ++buscaPontoAtual.current;
     const ponto = {
       id: `coord:${latitude.toFixed(5)},${longitude.toFixed(5)}`,
-      nome: 'Ponto selecionado no mapa',
-      endereço: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+      nome: 'Localizando endereço…',
+      endereço: 'Mantendo o ponto escolhido no centro do mapa.',
       latitude,
       longitude,
     };
@@ -226,8 +234,16 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     definirErro('');
     try {
       const local = await api(`/places/reverse?lat=${latitude}&lon=${longitude}`);
-      await escolherLocal(local);
+      if (idBusca !== buscaPontoAtual.current) return;
+      // Preserve the exact coordinate selected by the user; reverse geocoding
+      // is only used to supply a readable address and destination label.
+      const localSelecionado = { ...local, latitude, longitude };
+      definirSelecionado(localSelecionado);
+      definirCepsDoEndereco(local.cep ? [{ cep: local.cep, bairro: local.bairro || '' }] : []);
+      await carregarItensDoDestino(localSelecionado.nome, idBusca);
     } catch (falha) {
+      if (idBusca !== buscaPontoAtual.current) return;
+      definirSelecionado({ ...ponto, nome: 'Ponto selecionado no mapa', endereço: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}` });
       definirErro(falha.message || 'Marquei o ponto, mas não consegui identificar o endereço. Você ainda pode usar estas coordenadas como destino.');
     }
   }
