@@ -43,6 +43,8 @@ export default function App() {
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     document.documentElement.lang = 'pt-BR';
+    document.documentElement.setAttribute('translate', 'no');
+    document.documentElement.classList.add('notranslate');
     document.title = 'Lembriê — objetos sempre por perto';
     let metaTema = document.querySelector('meta[name="theme-color"]');
     if (!metaTema) {
@@ -352,7 +354,7 @@ export default function App() {
         <StatusBar style="dark" />
         <View style={estilos.cabecalho}>
           <View style={estilos.marcaCabecalho}><MaterialCommunityIcons name="map-marker-check" size={22} color={cores.branco} /></View>
-          <View style={estilos.textosCabecalho}><Text style={estilos.nomeApp}>LEMBRIÊ</Text><Text style={estilos.tituloCabecalho}>{título}</Text></View>
+          <View style={estilos.textosCabecalho}><Text style={estilos.nomeApp}>LEMBRIÊ</Text><Text numberOfLines={1} ellipsizeMode="tail" style={estilos.tituloCabecalho}>{título}</Text></View>
           <Pressable accessibilityRole="button" accessibilityLabel="Atualizar dados" onPress={() => carregarDados(false)} hitSlop={9} style={estilos.botaoAtualizar}>
             {atualizando ? <ActivityIndicator size="small" color={cores.primario} /> : <Ionicons name="refresh-outline" size={20} color={cores.primario} />}
           </Pressable>
@@ -408,7 +410,7 @@ function ItemNavegação({ ativo, ícone, íconeAtivo, rótulo, aoPressionar }) 
   return (
     <Pressable accessibilityRole="tab" accessibilityState={{ selected: ativo }} onPress={aoPressionar} style={estilos.itemNavegação}>
       <View style={[estilos.iconeNavegação, ativo && estilos.iconeNavegaçãoAtiva]}><Ionicons name={ativo ? íconeAtivo : ícone} size={20} color={ativo ? cores.primario : '#7C8493'} /></View>
-      <Text style={[estilos.textoNavegação, ativo && estilos.textoNavegaçãoAtivo]}>{rótulo}</Text>
+      <Text numberOfLines={1} ellipsizeMode="tail" style={[estilos.textoNavegação, ativo && estilos.textoNavegaçãoAtivo]}>{rótulo}</Text>
     </Pressable>
   );
 }
