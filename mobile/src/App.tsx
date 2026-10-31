@@ -15,6 +15,7 @@ import TelaConfiguracoes from './telas/TelaConfiguracoes';
 import TelaHistorico from './telas/TelaHistorico';
 import TelaMapaRotina from './telas/TelaMapaRotina';
 import TelaPerfil from './telas/TelaPerfil';
+import TelaAcessoSeguranca from './telas/TelaAcessoSeguranca';
 import TelaAssistente from './telas/TelaAssistente';
 import { cores } from './tema';
 
@@ -505,7 +506,9 @@ export default function App() {
   } else if (tela === 'mapa') {
     conteúdo = <TelaMapaRotina api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} abrirObjetos={() => abrirTela('objetos')} notificar={notificar} atualizarDados={() => carregarDados(true)} />;
   } else if (tela === 'perfil') {
-    conteúdo = <TelaPerfil perfil={perfil} api={chamarApi} salvarPerfil={salvarPerfil} solicitarVerificacaoEmail={solicitarVerificacaoEmail} alterarSenha={alterarSenha} recuperarSenha={recuperarSenha} notificar={notificar} />;
+    conteúdo = <TelaPerfil perfil={perfil} salvarPerfil={salvarPerfil} solicitarVerificacaoEmail={solicitarVerificacaoEmail} alterarSenha={alterarSenha} recuperarSenha={recuperarSenha} notificar={notificar} />;
+  } else if (tela === 'acesso') {
+    conteúdo = <TelaAcessoSeguranca api={chamarApi} segurancaInicial={seguranca} />;
   } else if (tela === 'assistente') {
     conteúdo = <TelaAssistente api={chamarApi} />;
   } else if (tela === 'historico') {
@@ -516,7 +519,7 @@ export default function App() {
 
   const título = {
     inicio: 'Início', objetos: 'Meus objetos', bluetooth: 'Bluetooth', saida: 'Antes de sair',
-    historico: 'Histórico', configuracoes: 'Configurações', mapa: 'Mapa e rotina', perfil: 'Meu perfil', assistente: 'Ajuda com IA',
+    historico: 'Histórico', configuracoes: 'Configurações', mapa: 'Mapa e rotina', perfil: 'Meu perfil', acesso: 'Acesso e segurança', assistente: 'Ajuda com IA',
   }[tela] || 'Lembriê';
 
   return (
@@ -526,7 +529,7 @@ export default function App() {
         <View style={estilos.cabecalho}>
           <View style={estilos.marcaCabecalho}><MaterialCommunityIcons name="map-marker-check" size={22} color={cores.branco} /></View>
           <View style={estilos.textosCabecalho}><Text style={estilos.nomeApp}>LEMBRIÊ</Text><Text numberOfLines={1} ellipsizeMode="tail" style={estilos.tituloCabecalho}>{título}</Text></View>
-          {Platform.OS === 'web' && dimensoesJanela.width >= 760 && tela === 'inicio' ? <Pressable accessibilityRole="button" accessibilityLabel={'Abrir detalhes do último login: ' + textoUltimoLogin} onPress={() => abrirTela('perfil')} style={estilos.resumoLoginCabecalho}>
+          {Platform.OS === 'web' && dimensoesJanela.width >= 760 && tela === 'inicio' ? <Pressable accessibilityRole="button" accessibilityLabel={'Abrir detalhes do último login: ' + textoUltimoLogin} onPress={() => abrirTela('acesso')} style={estilos.resumoLoginCabecalho}>
             <View style={estilos.iconeResumoLoginCabecalho}><Ionicons name="shield-checkmark" size={19} color={cores.primario} /></View>
             <View style={estilos.textoResumoLoginCabecalho}>
               <Text style={estilos.rotuloResumoLoginCabecalho}>ÚLTIMO LOGIN</Text>
@@ -561,7 +564,7 @@ export default function App() {
             <ItemNavegação ativo={tela === 'objetos'} ícone="cube-outline" íconeAtivo="cube" rótulo="Objetos" aoPressionar={() => abrirTela('objetos')} />
             <ItemNavegação ativo={tela === 'bluetooth'} ícone="bluetooth-outline" íconeAtivo="bluetooth" rótulo="Bluetooth" aoPressionar={() => abrirTela('bluetooth')} />
             <ItemNavegação ativo={tela === 'saida'} ícone="checkbox-outline" íconeAtivo="checkbox" rótulo="Saída" aoPressionar={() => abrirTela('saida')} />
-            <ItemNavegação ativo={menuAberto || ['mapa', 'historico', 'configuracoes', 'perfil', 'assistente'].includes(tela)} ícone="grid-outline" íconeAtivo="grid" rótulo="Mais" aoPressionar={() => definirMenuAberto(true)} />
+            <ItemNavegação ativo={menuAberto || ['mapa', 'historico', 'configuracoes', 'perfil', 'acesso'].includes(tela)} ícone="grid-outline" íconeAtivo="grid" rótulo="Mais" aoPressionar={() => definirMenuAberto(true)} />
           </View>
         </SafeAreaView>
 
@@ -572,9 +575,8 @@ export default function App() {
               <View style={estilos.alçaMenu} />
               <View style={estilos.cabeçalhoMenu}><View><Text style={estilos.tituloMenu}>Mais opções</Text><Text style={estilos.subtituloMenu}>{perfil?.name || perfil?.email || 'Sua conta'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Fechar menu" onPress={() => definirMenuAberto(false)} style={estilos.fecharMenu}><Ionicons name="close" size={20} color={cores.texto} /></Pressable></View>
               <View style={estilos.listaMenu}>
-                <ItemMenu ativo={tela === 'assistente'} ícone="sparkles-outline" título="Ajuda com IA" texto="Tire dúvidas e peça sugestões para o destino" aoPressionar={() => abrirTela('assistente')} />
-                <ItemMenu ativo={tela === 'mapa'} ícone="map-outline" título="Mapa e rotina" texto="Planeje um destino e seus itens" aoPressionar={() => abrirTela('mapa')} />
                 <ItemMenu ativo={tela === 'historico'} ícone="time-outline" título="Histórico" texto="Atividades recentes" aoPressionar={() => abrirTela('historico')} />
+                <ItemMenu ativo={tela === 'acesso'} ícone="shield-checkmark-outline" título="Acesso e segurança" texto="Confira o último login da conta" aoPressionar={() => abrirTela('acesso')} />
                 <ItemMenu ativo={tela === 'perfil'} ícone="person-circle-outline" título="Meu perfil" texto="Atualize seus dados e senha" aoPressionar={() => abrirTela('perfil')} />
                 <ItemMenu ativo={tela === 'configuracoes'} ícone="settings-outline" título="Configurações" texto="Preferências e conta" aoPressionar={() => abrirTela('configuracoes')} />
               </View>

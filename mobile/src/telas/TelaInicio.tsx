@@ -88,7 +88,7 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
         <View style={estilos.avatar}><Text style={estilos.letraAvatar}>{nome.charAt(0).toLocaleUpperCase('pt-BR')}</Text></View>
       </View>
 
-      {mostrarResumoLogin ? <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes do último login" onPress={() => abrirTela('perfil')} style={estilos.cartaoUltimoAcesso}>
+      {mostrarResumoLogin ? <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes do último login" onPress={() => abrirTela('acesso')} style={estilos.cartaoUltimoAcesso}>
         <View style={estilos.iconeUltimoAcesso}><Ionicons name="shield-checkmark" size={18} color={cores.primario} /></View>
         <View style={estilos.detalheUltimoAcesso}>
           <View style={estilos.linhaUltimoAcesso}><Text style={estilos.rotuloUltimoAcesso}>ÚLTIMO LOGIN</Text><Text style={estilos.dataUltimoAcesso}>{textoUltimoAcesso}</Text></View>
