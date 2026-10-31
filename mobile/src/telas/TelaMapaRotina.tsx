@@ -156,9 +156,13 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       if (idBusca !== undefined && idBusca !== buscaPontoAtual.current) return;
       const todos = Array.isArray(dados.allRegisteredItems) ? dados.allRegisteredItems : [];
       const relacionados = Array.isArray(dados.registeredItems) ? dados.registeredItems : [];
+      const sugestõesGerais = Array.isArray(dados.items) ? dados.items : [];
       definirObjetosSugeridos(relacionados);
       definirObjetosCadastrados(todos);
       definirObjetosSelecionados(relacionados.map(item => String(item.id)));
+      definirItensSugeridosGemini(sugestõesGerais);
+      definirMotivoSugestaoIA(sugestõesGerais.length ? 'Lista inicial baseada no tipo de destino e nos locais próximos. O Gemini pode complementar as sugestões.' : '');
+      definirRespostaIAAtiva(false);
       return { allRegisteredItems: todos, registeredItems: relacionados };
     } catch (falha) {
       if (idBusca !== undefined && idBusca !== buscaPontoAtual.current) return;
@@ -370,9 +374,25 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
         {locaisProximos.categories.length ? <View style={estilos.contextoProximo}><Text style={estilos.tituloContextoProximo}>O que existe por perto</Text><Text style={estilos.textoContextoProximo}>{locaisProximos.categories.join(' · ')}</Text>{locaisProximos.places.length ? <Text style={estilos.textoContextoProximo}>{locaisProximos.places.map(local => local.distancia != null ? `${local.nome} (${local.distancia} m)` : local.nome).join(' · ')}</Text> : null}</View> : null}
         {cepsDoEndereco.length > 1 ? <View style={estilos.cepsEncontrados}><Text style={estilos.endereçoResultado}>Mais de um CEP encontrado para este logradouro. Confira o bairro para escolher:</Text>{cepsDoEndereco.map(opção => <Pressable key={opção.cep} onPress={() => definirSelecionado(atual => ({ ...atual, cep: opção.cep, bairro: opção.bairro }))} style={[estilos.opcaoCep, selecionado.cep === opção.cep && estilos.opcaoCepAtiva]}><Text style={[estilos.textoOpcaoCep, selecionado.cep === opção.cep && estilos.textoOpcaoCepAtivo]}>{opção.cep}{opção.bairro ? ` · ${opção.bairro}` : ''}</Text></Pressable>)}</View> : null}
         <View style={estilos.cartaoSugestões}>
+          {itensSugeridosGemini.length ? <View style={estilos.cartaoRecomendacaoDestino}>
+            <View style={estilos.cabecalhoRecomendacaoDestino}>
+              <View style={estilos.iconeRecomendacaoDestino}><Ionicons name="sparkles" size={21} color={cores.primario} /></View>
+              <View style={estilos.textosCabecalhoRecomendacao}>
+                <Text style={estilos.etiquetaRecomendacao}>{respostaIAAtiva ? 'SUGESTÃO DO GEMINI' : 'SUGESTÃO PARA O LOCAL'}</Text>
+                <Text style={estilos.subtituloRecomendacao}>Pensando no seu destino</Text>
+              </View>
+            </View>
+            <Text style={estilos.tituloRecomendacao}>O que eu levaria</Text>
+            <View style={estilos.itensRecomendacao}>{itensSugeridosGemini.map(item => <View key={item} style={estilos.itemRecomendacao}>
+              <Ionicons name="checkmark-circle-outline" size={18} color={cores.primario} />
+              <Text style={estilos.textoItemRecomendacao}>{item}</Text>
+            </View>)}</View>
+            <Text style={estilos.notaRecomendacao}>Sugestões gerais para este lugar. Podem incluir itens que ainda não estão cadastrados.</Text>
+            {respostaIAAtiva && motivoSugestaoIA ? <Text style={estilos.motivoRecomendacao}>{motivoSugestaoIA}</Text> : null}
+          </View> : null}
           {objetosCadastrados.length ? <>
-            <View style={estilos.cabecalhoObjetos}><TituloSecao título="O QUE VOCÊ VAI LEVAR?" /><Pressable accessibilityRole="button" onPress={() => { definirResultadoConferencia(null); definirObjetosSelecionados(objetosSelecionados.length === objetosCadastrados.length ? [] : objetosCadastrados.map(item => String(item.id))); }}><Text style={estilos.acaoSelecao}>{objetosSelecionados.length === objetosCadastrados.length ? 'Limpar' : 'Selecionar todos'}</Text></Pressable></View>
-            <Text style={estilos.notaSugestões}>A lista geral considera o destino e os locais próximos. Seus objetos cadastrados aparecem à parte para você marcar o que vai levar.</Text>
+            <View style={estilos.cabecalhoObjetos}><TituloSecao título="SEUS OBJETOS CADASTRADOS" /><Pressable accessibilityRole="button" onPress={() => { definirResultadoConferencia(null); definirObjetosSelecionados(objetosSelecionados.length === objetosCadastrados.length ? [] : objetosCadastrados.map(item => String(item.id))); }}><Text style={estilos.acaoSelecao}>{objetosSelecionados.length === objetosCadastrados.length ? 'Limpar' : 'Selecionar todos'}</Text></Pressable></View>
+            <Text style={estilos.notaSugestões}>Marque quais objetos da sua conta você vai levar. Eles ficam separados das sugestões gerais.</Text>
             <View style={estilos.listaObjetos}>{objetosCadastrados.map(item => {
               const recomendado = objetosSugeridos.some(objeto => String(objeto.id) === String(item.id)) || objetosRecomendadosIA.some(nome => nome.toLocaleLowerCase('pt-BR') === String(item.name).toLocaleLowerCase('pt-BR'));
               const marcado = objetosSelecionados.includes(String(item.id));
@@ -387,12 +407,10 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
             {gerandoSugestoesIA || buscandoProximidade ? <ActivityIndicator size="small" color={cores.primario} /> : <Ionicons name="sparkles-outline" size={17} color={cores.primario} />}
             <Text style={estilos.textoLocalização}>{buscandoProximidade ? 'Identificando locais próximos…' : gerandoSugestoesIA ? 'Preparando recomendações…' : 'Gerar recomendação do Gemini'}</Text>
           </Pressable>
-          {itensSugeridosGemini.length || objetosRecomendadosIA.length || motivoSugestaoIA ? <View style={estilos.listaSugestões}>
+          {objetosRecomendadosIA.length || respostaIAAtiva !== null ? <View style={estilos.listaSugestões}>
             <View style={estilos.resultadoRecomendacao}>
-              <TituloSecao título={respostaIAAtiva ? 'SUGESTÕES DO GEMINI' : 'SUGESTÕES PARA ESTE DESTINO'} />
-              {itensSugeridosGemini.length ? <Text style={estilos.notaSugestões}>Para este destino, recomendo levar: {itensSugeridosGemini.join(', ')}.</Text> : <Text style={estilos.notaSugestões}>Não consegui montar uma lista geral para este destino.</Text>}
-              {objetosRecomendadosIA.length ? <Text style={estilos.notaSugestões}>Da sua lista: {objetosRecomendadosIA.join(', ')}.</Text> : <Text style={estilos.notaSugestões}>Nenhum objeto cadastrado combinou com estas sugestões. Você ainda pode usar a lista geral acima.</Text>}
-              {motivoSugestaoIA ? <Text style={estilos.notaSugestões}>{motivoSugestaoIA}</Text> : null}
+              <TituloSecao título="COMBINA COM A SUA LISTA" />
+              {objetosRecomendadosIA.length ? <Text style={estilos.notaSugestões}>Da sua conta: {objetosRecomendadosIA.join(', ')}.</Text> : <Text style={estilos.notaSugestões}>Nenhum objeto cadastrado combinou com estas sugestões. Você ainda pode usar a recomendação geral acima.</Text>}
               {objetosRecomendadosIA.length ? <Pressable accessibilityRole="button" onPress={() => {
                 const ids = objetosCadastrados.filter(item => objetosRecomendadosIA.some(nome => nome.toLocaleLowerCase('pt-BR') === String(item.name).toLocaleLowerCase('pt-BR'))).map(item => String(item.id));
                 definirObjetosSelecionados(atuais => [...new Set([...atuais, ...ids])]);
