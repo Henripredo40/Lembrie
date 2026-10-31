@@ -3,7 +3,7 @@ import { cores, raios } from '../tema';
 
 const estilos = StyleSheet.create({
   tela: { flex: 1, backgroundColor: cores.fundo },
-  conteudo: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 92, maxWidth: 720, width: '100%', alignSelf: 'center' },
+  conteudo: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 160, maxWidth: 720, width: '100%', alignSelf: 'center' },
   cabecalhoBoasVindas: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
   blocoTexto: { flex: 1 },
   saudacao: { color: cores.primario, fontSize: 13, fontWeight: '900', letterSpacing: 1.1 },
@@ -62,6 +62,11 @@ const estilos = StyleSheet.create({
   mensagemAtividade: { color: cores.texto, fontSize: 13, fontWeight: '700' },
   dataAtividade: { color: cores.textoSuave, fontSize: 13, marginTop: 3 },
   semAtividade: { color: cores.textoSuave, fontSize: 13, backgroundColor: cores.branco, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: cores.linha },
+  mapaFlutuante: { position: 'absolute', right: 16, bottom: 76, width: 270, minHeight: 72, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 20, backgroundColor: cores.branco, borderWidth: 1, borderColor: '#BBDCD5', flexDirection: 'row', alignItems: 'center', gap: 9, elevation: 6, shadowColor: '#0B3F39', shadowOpacity: 0.18, shadowRadius: 9, shadowOffset: { width: 0, height: 4 }, zIndex: 20 },
+  iconeMapaFlutuante: { width: 38, height: 38, borderRadius: 13, backgroundColor: cores.primarioClaro, alignItems: 'center', justifyContent: 'center' },
+  textoMapaFlutuante: { flex: 1, minWidth: 0 },
+  tituloMapaFlutuante: { color: cores.texto, fontSize: 13, fontWeight: '900' },
+  subtituloMapaFlutuante: { color: cores.textoSuave, fontSize: 10, lineHeight: 14, marginTop: 2 },
   ajudaFlutuante: { position: 'absolute', right: 16, bottom: 16, minHeight: 50, paddingHorizontal: 18, borderRadius: 25, backgroundColor: cores.primario, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, elevation: 7, shadowColor: '#0B3F39', shadowOpacity: 0.24, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, zIndex: 20 },
   textoAjudaFlutuante: { color: cores.branco, fontSize: 14, fontWeight: '900' },
 });

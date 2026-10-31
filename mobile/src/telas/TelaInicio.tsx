@@ -212,6 +212,11 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
         </>
       )}
     </ScrollView>
+    <Pressable accessibilityRole="button" accessibilityLabel="Abrir Mapa e rotina para pesquisar um destino e planejar o que levar" onPress={() => abrirTela('mapa')} style={({ pressed }) => [estilos.mapaFlutuante, pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] }]}>
+      <View style={estilos.iconeMapaFlutuante}><Ionicons name="map-outline" size={20} color={cores.primario} /></View>
+      <View style={estilos.textoMapaFlutuante}><Text style={estilos.tituloMapaFlutuante}>Mapa e rotina</Text><Text numberOfLines={2} style={estilos.subtituloMapaFlutuante}>Pesquise um destino e planeje o que levar</Text></View>
+      <Ionicons name="chevron-forward" size={17} color={cores.primario} />
+    </Pressable>
     <Pressable accessibilityRole="button" accessibilityLabel="Abrir ajuda com IA" onPress={() => abrirTela('assistente')} style={({ pressed }) => [estilos.ajudaFlutuante, pressed && { opacity: 0.86, transform: [{ scale: 0.97 }] }]}>
       <Ionicons name="sparkles" size={18} color={cores.branco} />
       <Text style={estilos.textoAjudaFlutuante}>Ajuda</Text>
