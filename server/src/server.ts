@@ -1543,10 +1543,29 @@ function respostaAjudaUso(mensagem) {
   return null;
 }
 
+async function responderConsultaObjetos(usuario, mensagem) {
+  const pergunta = String(mensagem || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  if (/(essencia|importante)/.test(pergunta)) {
+    const [itens] = await db.execute('SELECT name FROM objects WHERE user_id=? AND important=TRUE ORDER BY name LIMIT 80', [usuario]);
+    if (itens.length) return `Seus itens essenciais cadastrados são: ${itens.map(item => item.name).join(', ')}.`;
+    const [todos] = await db.execute('SELECT name FROM objects WHERE user_id=? ORDER BY name LIMIT 80', [usuario]);
+    return todos.length
+      ? `Você ainda não marcou nenhum item como essencial. Seus objetos cadastrados são: ${todos.map(item => item.name).join(', ')}. Para marcar um, abra “Objetos”, edite o item e ative “Marcar como essencial”.`
+      : 'Você ainda não cadastrou objetos. Abra “Objetos” para adicionar o primeiro; depois poderá marcá-lo como essencial.';
+  }
+  if (/(objeto|item|cadastrad|minha lista)/.test(pergunta) && /(quais|listar|mostra|mostrar|ver|lista|cadastrad|minha lista)/.test(pergunta)) {
+    const [itens] = await db.execute('SELECT name,category FROM objects WHERE user_id=? ORDER BY name LIMIT 80', [usuario]);
+    return itens.length
+      ? `Você tem ${itens.length} objeto${itens.length === 1 ? '' : 's'} cadastrado${itens.length === 1 ? '' : 's'}: ${itens.map(item => `${item.name} (${item.category || 'Outros'})`).join(', ')}.`
+      : 'Sua lista ainda está vazia. Abra “Objetos” para cadastrar seu primeiro item.';
+  }
+  return null;
+}
+
 async function responderAssistente(usuario, mensagem) {
   const respostaDeUso = respostaAjudaUso(mensagem);
   if (respostaDeUso) return respostaDeUso;
-  const pergunta = String(mensagem || '').trim().toLocaleLowerCase('pt-BR');
+  const pergunta = String(mensagem || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
   const [objetos] = await db.execute(
     `SELECT o.name,o.important,d.connected,d.ble_uuid
      FROM objects o LEFT JOIN devices d ON d.object_id=o.id AND d.user_id=o.user_id
@@ -1581,7 +1600,7 @@ async function responderAssistente(usuario, mensagem) {
     if (sinalFraco.length) return `Os chaveiros destes itens essenciais não estão enviando sinal agora: ${sinalFraco.join(', ')}. Confirme manualmente, pois a conexão Bluetooth não prova que o item está com você.`;
     return essenciais.length ? `Confira manualmente seus itens essenciais: ${essenciais.join(', ')}. Ainda não há um alerta confiável de esquecimento.` : 'Cadastre seus objetos e marque os essenciais para eu montar uma lista personalizada.';
   }
-  if (pergunta.includes('essencial') || pergunta.includes('importante')) {
+  if (pergunta.includes('essencia') || pergunta.includes('importante')) {
     return essenciais.length ? `Seus itens essenciais são: ${essenciais.join(', ')}.` : 'Você ainda não marcou objetos como essenciais. Faça isso na tela Meus objetos.';
   }
   if (pergunta.includes('levar') || pergunta.includes('destino') || destino) {
@@ -1699,12 +1718,15 @@ app.get('/assistant/status', auth, (_q, r) => {
 app.post('/assistant', auth, async (q, r) => {
   const mensagem = String(q.body.message || '').trim();
   if (!mensagem || mensagem.length > 500) return r.status(400).json({ error: 'Escreva uma mensagem de até 500 caracteres.' });
-  const respostaDeUso = respostaAjudaUso(mensagem);
-  if (respostaDeUso) return r.json({ answer: respostaDeUso, ai: Boolean(String(process.env.GEMINI_API_KEY || '').trim()), guide: true });
   const historico = Array.isArray(q.body.history) ? q.body.history
     .filter(item => item && ['user', 'assistant'].includes(item.role) && typeof item.text === 'string')
     .slice(-8)
     .map(item => ({ papel: item.role === 'user' ? 'pessoa' : 'assistente', texto: item.text.slice(0, 500) })) : [];
+  const perguntaComContexto = [...historico.filter(item => item.papel === 'pessoa').map(item => item.texto), mensagem].join('\n');
+  const respostaDeUso = respostaAjudaUso(mensagem);
+  if (respostaDeUso) return r.json({ answer: respostaDeUso, ai: Boolean(String(process.env.GEMINI_API_KEY || '').trim()), guide: true });
+  const respostaDosObjetos = await responderConsultaObjetos(q.user.id, perguntaComContexto);
+  if (respostaDosObjetos) return r.json({ answer: respostaDosObjetos, ai: Boolean(String(process.env.GEMINI_API_KEY || '').trim()), guide: true });
   const contexto = await carregarContextoIA(q.user.id);
   const prompt = JSON.stringify({ contextoDaConta: contexto, conversaRecente: historico, perguntaAtual: mensagem });
   if (String(process.env.GEMINI_API_KEY || '').trim()) {
@@ -1720,6 +1742,8 @@ app.post('/assistant', auth, async (q, r) => {
 });
 
 app.get('/assistant', auth, async (q, r) => {
+  const respostaDosObjetos = await responderConsultaObjetos(q.user.id, q.query.q);
+  if (respostaDosObjetos) return r.json({ answer: respostaDosObjetos });
   r.json({ answer: await responderAssistente(q.user.id, q.query.q) });
 });
 
