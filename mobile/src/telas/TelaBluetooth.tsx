@@ -284,14 +284,14 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
           </View>
 
           <View style={estilos.cartaoAviso}>
-            <View style={estilos.cabecalhoAviso}><Ionicons name="construct-outline" size={19} color={cores.primario} /><Text style={estilos.tituloAviso}>Chaveiro em desenvolvimento</Text></View>
-            <Text style={estilos.textoAviso}>Conecte o chaveiro, veja os serviços e as características anunciados pelo firmware e acompanhe o estado da conexão. Para ativar alarme e detecção de afastamento, o firmware precisa definir os UUIDs e o formato dos comandos.</Text>
+            <View style={estilos.cabecalhoAviso}><Ionicons name="construct-outline" size={19} color={cores.primario} /><Text style={estilos.tituloAviso}>Como conectar</Text></View>
+            <Text style={estilos.textoAviso}>Ligue a placa no interruptor físico e mantenha o chaveiro perto do celular. Escolha o objeto, toque em “Buscar meu chaveiro” e conecte ao dispositivo encontrado. A placa precisa estar ligada para o app encontrá-la.</Text>
           </View>
 
           {objetos.length ? (
             <View style={estilos.cartaoBusca}>
               <Text style={estilos.tituloBusca}>Associar a qual objeto?</Text>
-              <Text style={estilos.textoBusca}>Escolha o objeto e depois procure o dispositivo Bluetooth que será usado como chaveiro.</Text>
+              <Text style={estilos.textoBusca}>Escolha o objeto que receberá o chaveiro. O app vai procurar dispositivos Bluetooth próximos.</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.listaObjetos}>
                 {objetos.map((objeto) => (
                   <Pressable key={String(objeto.id)} accessibilityRole="button" onPress={() => escolherObjeto(String(objeto.id))} style={[estilos.opcaoObjeto, String(objeto.id) === String(objetoEscolhido) && estilos.opcaoObjetoAtiva]}>
@@ -300,7 +300,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
                   </Pressable>
                 ))}
               </ScrollView>
-              <Botao título={procurando ? 'Procurando dispositivos...' : 'Buscar dispositivos'} ícone="bluetooth-outline" aoPressionar={procurando ? pararBusca : iniciarBusca} carregando={false} estilo={estilos.botaoBusca} />
+              <Botao título={procurando ? 'Procurando chaveiro...' : 'Buscar meu chaveiro'} ícone="bluetooth-outline" aoPressionar={procurando ? pararBusca : iniciarBusca} carregando={false} estilo={estilos.botaoBusca} />
               {procurando ? <Text style={estilos.tempoBusca}>Busca ativa por até 15 segundos. Mantenha o dispositivo por perto.</Text> : null}
             </View>
           ) : (
@@ -324,7 +324,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
                   </Pressable>
                 );
               })}
-              <Botao título={conectando ? 'Conectando e lendo serviços...' : 'Conectar e associar a ' + (objetoSelecionado?.name || 'objeto')} ícone="bluetooth-connect" aoPressionar={associarDispositivo} carregando={vinculando} desativado={!dispositivoEscolhido || !objetoEscolhido} estilo={{ marginTop: 11 }} />
+              <Botao título={conectando ? 'Conectando ao chaveiro...' : 'Conectar chaveiro a ' + (objetoSelecionado?.name || 'objeto')} ícone="bluetooth-connect" aoPressionar={associarDispositivo} carregando={vinculando} desativado={!dispositivoEscolhido || !objetoEscolhido} estilo={{ marginTop: 11 }} />
             </View>
           ) : !procurando ? (
             <View style={estilos.semResultados}><Ionicons name="radio-outline" size={22} color={cores.textoSuave} /><Text style={estilos.textoSemResultados}>Os dispositivos encontrados aparecerão aqui.</Text></View>
