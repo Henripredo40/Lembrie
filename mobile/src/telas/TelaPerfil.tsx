@@ -172,7 +172,7 @@ export default function TelaPerfil({ perfil, api, salvarPerfil, solicitarVerific
         <View style={estilos.linhaSeguranca}><Text style={estilos.rotuloSeguranca}>Último login</Text><Text style={estilos.valorSeguranca}>{dataAcesso(seguranca?.last_login)}</Text></View>
         {seguranca?.sessions?.[0] ? <>
           <View style={estilos.linhaSeguranca}><Text style={estilos.rotuloSeguranca}>Aparelho</Text><Text style={estilos.valorSeguranca}>{seguranca.sessions[0].device_label}</Text></View>
-          <View style={estilos.linhaSeguranca}><Text style={estilos.rotuloSeguranca}>Local aproximado</Text><Text style={estilos.valorSeguranca}>{seguranca.sessions[0].location_label || 'Indisponível'}</Text></View>
+          {seguranca.sessions[0].location_label ? <View style={estilos.linhaSeguranca}><Text style={estilos.rotuloSeguranca}>Local aproximado</Text><Text style={estilos.valorSeguranca}>{seguranca.sessions[0].location_label}</Text></View> : null}
           <View style={estilos.linhaSeguranca}><Text style={estilos.rotuloSeguranca}>Tempo de uso nesta sessão</Text><Text style={estilos.valorSeguranca}>{duracaoSessao(seguranca.sessions[0].active_seconds)}{seguranca.sessions[0].active ? ' · em uso' : ''}</Text></View>
         </> : <Text style={estilos.subtituloSeguranca}>O histórico de sessões aparecerá após o próximo acesso.</Text>}
         <Text style={estilos.notaSeguranca}>O local mostra apenas cidade e estado quando disponíveis; as coordenadas não são salvas. O aparelho é identificado pelos dados informados pelo sistema. O registro confirma o uso das credenciais da conta, mas não identifica a pessoa que estava com o aparelho. O tempo é aproximado e conta enquanto o app ou site está em uso.</Text>

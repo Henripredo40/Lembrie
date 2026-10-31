@@ -23,19 +23,14 @@ const preferênciasIniciais = { notifications: true, routine_enabled: false, pre
 const preferênciaAtiva = (valor) => valor === true || Number(valor) === 1;
 function identificarDispositivo() {
   if (Platform.OS === 'android' || Platform.OS === 'ios') {
-    const constantes = Platform.constants as any;
-    const fabricante = String(constantes?.Manufacturer || constantes?.Brand || '').trim();
-    const modelo = String(constantes?.Model || '').trim();
-    const nomeModelo = [fabricante, modelo].filter((valor, índice, lista) => valor && lista.indexOf(valor) === índice).join(' ');
-    const plataforma = Platform.OS === 'android' ? 'Android' : 'iPhone/iPad';
-    return nomeModelo ? 'Aplicativo ' + nomeModelo + ' (' + plataforma + ')' : 'Aplicativo ' + plataforma + ' · modelo não informado';
+    return Platform.OS === 'android' ? 'Celular · Android' : 'Celular · iOS';
   }
   if (typeof navigator === 'undefined') return 'Navegador';
   const agente = navigator.userAgent || '';
-  const androidModelo = agente.match(/Android\s[^;]+;\s*([^;)]+)(?:\sBuild)?/i)?.[1]?.trim();
-  const sistema = /Android/i.test(agente) ? 'Android' : /iPhone|iPad/i.test(agente) ? 'iPhone/iPad' : /Windows/i.test(agente) ? 'Windows' : /Mac OS/i.test(agente) ? 'macOS' : /Linux/i.test(agente) ? 'Linux' : 'dispositivo';
+  const móvel = /Android|iPhone|iPad|Mobile/i.test(agente);
+  const sistema = /Android/i.test(agente) ? 'Android' : /iPhone|iPad/i.test(agente) ? 'iOS' : /Windows/i.test(agente) ? 'Windows' : /Mac OS/i.test(agente) ? 'macOS' : /Linux/i.test(agente) ? 'Linux' : 'dispositivo';
   const navegador = /Edg\//i.test(agente) ? 'Edge' : /Firefox\//i.test(agente) ? 'Firefox' : /Chrome\//i.test(agente) ? 'Chrome' : /Safari\//i.test(agente) ? 'Safari' : 'navegador';
-  return (androidModelo ? androidModelo + ' — ' : '') + navegador + ' em ' + sistema;
+  return (móvel ? 'Celular' : 'PC') + ' · ' + navegador + ' (' + sistema + ')';
 }
 
 export default function App() {
