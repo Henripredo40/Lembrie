@@ -117,6 +117,7 @@ async function init() {
     id CHAR(36) PRIMARY KEY,
     user_id BIGINT NOT NULL,
     device_label VARCHAR(120) NOT NULL DEFAULT 'Dispositivo não identificado',
+    location_label VARCHAR(180) NULL,
     started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_activity_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ended_at DATETIME NULL,
@@ -124,6 +125,7 @@ async function init() {
     INDEX idx_account_sessions_user_started(user_id, started_at),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
+  await ensureColumn('account_sessions', 'location_label', 'VARCHAR(180) NULL');
   await ensureColumn('settings', 'preventive_alerts', 'BOOLEAN DEFAULT TRUE');
   await ensureColumn('settings', 'essential_only', 'BOOLEAN DEFAULT FALSE');
   await ensureColumn('settings', 'routine_consent_at', 'DATETIME NULL');
@@ -538,13 +540,45 @@ app.get('/me', auth, async (q, r) => {
 app.get('/me/security', auth, async (q, r) => {
   try {
     const [users] = await db.execute('SELECT last_login FROM users WHERE id=? LIMIT 1', [q.user.id]);
-    const [sessions] = await db.execute(`SELECT id,device_label,started_at,last_activity_at,ended_at,active_seconds,
+    const [sessions] = await db.execute(`SELECT id,device_label,location_label,started_at,last_activity_at,ended_at,active_seconds,
       (ended_at IS NULL AND last_activity_at>=DATE_SUB(NOW(),INTERVAL 2 MINUTE)) AS active
       FROM account_sessions WHERE user_id=? ORDER BY started_at DESC LIMIT 10`, [q.user.id]);
     r.json({ last_login: users[0]?.last_login || null, sessions });
   } catch (error) {
     console.error('Falha ao carregar histórico de acesso:', error);
     r.status(500).json({ error: 'Não foi possível carregar os dados de segurança.' });
+  }
+});
+
+app.post('/sessions/location', auth, async (q, r) => {
+  const sessionId = String(q.body.session_id || '');
+  const latitude = Number(q.body.latitude);
+  const longitude = Number(q.body.longitude);
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId) || !Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return r.status(400).json({ error: 'Dados de localização inválidos.' });
+  }
+  try {
+    const [owned] = await db.execute('SELECT location_label FROM account_sessions WHERE id=? AND user_id=? LIMIT 1', [sessionId, q.user.id]);
+    if (!owned.length) return r.status(404).json({ error: 'Sessão não encontrada.' });
+    if (owned[0].location_label) return r.json({ location_label: owned[0].location_label });
+    const local = await (filaLugares = filaLugares.catch(() => {}).then(async () => {
+      const espera = Math.max(0, 1100 - (Date.now() - ultimoPedidoDeMapa));
+      if (espera) await new Promise(resolve => setTimeout(resolve, espera));
+      ultimoPedidoDeMapa = Date.now();
+      const url = new URL('https://nominatim.openstreetmap.org/reverse');
+      url.search = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: 'jsonv2', zoom: '10', addressdetails: '1' }).toString();
+      const response = await fetch(url, { headers: { 'Accept-Language': 'pt-BR,pt;q=0.9', 'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)', 'Referer': 'https://lembre-web.onrender.com/' }, signal: AbortSignal.timeout(10000) });
+      if (!response.ok) throw new Error('Não foi possível identificar a cidade deste acesso.');
+      return response.json();
+    }));
+    const dados = formatarResultadoLugar(local);
+    const localAproximado = [dados.cidade, dados.uf].filter(Boolean).join(', ').slice(0, 180);
+    if (!localAproximado) return r.json({ location_label: null });
+    await db.execute('UPDATE account_sessions SET location_label=? WHERE id=? AND user_id=? AND location_label IS NULL', [localAproximado, sessionId, q.user.id]);
+    r.json({ location_label: localAproximado });
+  } catch (error) {
+    console.error('Não foi possível identificar o local aproximado do acesso:', error.message);
+    r.status(502).json({ error: 'Não foi possível identificar a cidade deste acesso.' });
   }
 });
 

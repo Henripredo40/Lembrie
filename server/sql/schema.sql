@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS account_sessions (
   id CHAR(36) PRIMARY KEY,
   user_id BIGINT NOT NULL,
   device_label VARCHAR(120) NOT NULL DEFAULT 'Dispositivo não identificado',
+  location_label VARCHAR(180) NULL,
   started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_activity_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   ended_at DATETIME NULL,

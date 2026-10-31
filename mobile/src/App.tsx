@@ -28,7 +28,7 @@ function identificarDispositivo() {
     const modelo = String(constantes?.Model || '').trim();
     const nomeModelo = [fabricante, modelo].filter((valor, índice, lista) => valor && lista.indexOf(valor) === índice).join(' ');
     const plataforma = Platform.OS === 'android' ? 'Android' : 'iPhone/iPad';
-    return 'Aplicativo ' + (nomeModelo || plataforma) + ' (' + plataforma + ')';
+    return nomeModelo ? 'Aplicativo ' + nomeModelo + ' (' + plataforma + ')' : 'Aplicativo ' + plataforma + ' · modelo não informado';
   }
   if (typeof navigator === 'undefined') return 'Navegador';
   const agente = navigator.userAgent || '';
@@ -60,6 +60,8 @@ export default function App() {
   const [sugestaoGPS, definirSugestaoGPS] = useState(null);
   const temporizadorNotificação = useRef<any>(null);
   const sessãoConta = useRef<string | null>(null);
+  const [idSessãoConta, definirIdSessãoConta] = useState<string | null>(null);
+  const localEnviadoNaSessão = useRef<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -229,6 +231,7 @@ export default function App() {
   async function aceitarSessão(dados) {
     await AsyncStorage.setItem('token', dados.token);
     if (dados.session_id) await AsyncStorage.setItem('account_session_id', String(dados.session_id));
+    definirIdSessãoConta(dados.session_id ? String(dados.session_id) : null);
     definirToken(dados.token);
     definirPerfil(dados.user || null);
     definirTela('inicio');
@@ -360,6 +363,7 @@ export default function App() {
       definirSaindo(true);
       if (sessãoConta.current) await chamarApi('/sessions/end', { method: 'POST', body: JSON.stringify({ session_id: sessãoConta.current }) }).catch(() => {});
       sessãoConta.current = null;
+      definirIdSessãoConta(null);
       await AsyncStorage.removeItem('account_session_id').catch(() => {});
       await AsyncStorage.removeItem('token').catch(() => {});
       definirToken(null);
@@ -404,6 +408,7 @@ export default function App() {
         }
         if (!ativo || !idSessão) return;
         sessãoConta.current = idSessão;
+        definirIdSessãoConta(idSessão);
         started = true;
         await atualizarSessão();
         timer = setInterval(atualizarSessão, 60_000);
@@ -421,6 +426,23 @@ export default function App() {
       if (started && sessãoConta.current) void chamarApi('/sessions/heartbeat', { method: 'POST', body: JSON.stringify({ session_id: sessãoConta.current }) }).catch(() => {});
     };
   }, [token, chamarApi]);
+
+  useEffect(() => {
+    if (!token || permissaoLocalizacao !== 'permitida' || !idSessãoConta || localEnviadoNaSessão.current === idSessãoConta) return;
+    let ativo = true;
+    localEnviadoNaSessão.current = idSessãoConta;
+    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      .then(posição => {
+        if (!ativo) return;
+        if (posição.coords.accuracy != null && posição.coords.accuracy > 2000) {
+          if (localEnviadoNaSessão.current === idSessãoConta) localEnviadoNaSessão.current = null;
+          return;
+        }
+        return chamarApi('/sessions/location', { method: 'POST', body: JSON.stringify({ session_id: idSessãoConta, latitude: posição.coords.latitude, longitude: posição.coords.longitude }) });
+      })
+      .catch(() => { if (localEnviadoNaSessão.current === idSessãoConta) localEnviadoNaSessão.current = null; });
+    return () => { ativo = false; };
+  }, [token, permissaoLocalizacao, idSessãoConta, chamarApi]);
 
   async function salvarPreferências(novas) {
     const anteriores = preferências;
@@ -457,7 +479,7 @@ export default function App() {
     return <SafeAreaProvider><SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={estilos.raiz}><StatusBar style="dark" /><View style={{ flex: 1, justifyContent: 'center', padding: 24, maxWidth: 520, width: '100%', alignSelf: 'center', gap: 14 }}>
       <View style={{ width: 58, height: 58, borderRadius: 20, backgroundColor: cores.primarioClaro, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="location" size={29} color={cores.primario} /></View>
       <Text style={{ color: cores.texto, fontSize: 24, fontWeight: '900' }}>Localização necessária</Text>
-      <Text style={{ color: cores.textoSuave, fontSize: 15, lineHeight: 23 }}>O Lembriê usa o GPS enquanto o app ou site estiver aberto para reconhecer lugares visitados e sugerir itens. As coordenadas não ficam salvas; o nome aproximado do local pode ser guardado para identificar lugares frequentes. A IA só recebe esse nome e seus objetos cadastrados quando estiver ativada.</Text>
+      <Text style={{ color: cores.textoSuave, fontSize: 15, lineHeight: 23 }}>O Lembriê usa o GPS enquanto o app ou site estiver aberto para reconhecer lugares visitados e sugerir itens. As coordenadas não ficam salvas; nomes aproximados de lugares frequentes e a cidade/estado do último acesso podem ser guardados. A IA só recebe o local aproximado e seus objetos cadastrados quando estiver ativada.</Text>
       {permissaoLocalizacao === 'verificando' ? <ActivityIndicator size="small" color={cores.primario} /> : <Pressable accessibilityRole="button" onPress={solicitarPermissaoLocalizacao} style={{ minHeight: 50, paddingHorizontal: 16, borderRadius: 14, backgroundColor: cores.primario, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: cores.branco, fontWeight: '900' }}>Permitir localização e continuar</Text></Pressable>}
       {permissaoLocalizacao === 'negada' ? <Pressable accessibilityRole="button" onPress={() => { if (Platform.OS !== 'web') Linking.openSettings(); }}><Text style={{ color: cores.primario, fontSize: 13, fontWeight: '800' }}>{Platform.OS === 'web' ? 'Altere a permissão de localização nas configurações do site no navegador e tente novamente.' : 'Abrir configurações do aparelho'}</Text></Pressable> : null}
       <Pressable accessibilityRole="button" onPress={sairDaConta} style={{ paddingVertical: 12 }}><Text style={{ color: cores.textoSuave, textAlign: 'center' }}>Sair da conta</Text></Pressable>
