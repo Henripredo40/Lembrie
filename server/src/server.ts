@@ -135,6 +135,26 @@ async function init() {
     )
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS routine_location_visits(
+      id BIGINT PRIMARY KEY AUTO_INCREMENT,
+      user_id BIGINT NOT NULL,
+      destination VARCHAR(180) NOT NULL,
+      destination_hash CHAR(64) NOT NULL,
+      visit_count INT NOT NULL DEFAULT 1,
+      first_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_suggested_at DATETIME NULL,
+      UNIQUE KEY uq_location_visit(user_id,destination_hash),
+      FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await db.execute('DELETE FROM routine_location_visits WHERE last_seen < DATE_SUB(NOW(),INTERVAL 90 DAY)');
+  const limpezaLocais = setInterval(() => {
+    db.execute('DELETE FROM routine_location_visits WHERE last_seen < DATE_SUB(NOW(),INTERVAL 90 DAY)').catch(() => {});
+  }, 24 * 60 * 60 * 1000);
+  limpezaLocais.unref?.();
+
   await ensureColumn('routines', 'routine_time', "CHAR(5) NOT NULL DEFAULT '08:00'");
 
   await db.execute(`
@@ -1061,6 +1081,62 @@ app.get('/routine/plans', auth, async (q, r) => {
   r.json(plans);
 });
 
+const ultimaLeituraGPS = new Map();
+app.post('/routine/location', auth, async (q, r) => {
+  const latitude = Number(q.body.latitude);
+  const longitude = Number(q.body.longitude);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return r.status(400).json({ error: 'A posição recebida é inválida.' });
+  }
+  const agora = Date.now();
+  if (agora - (ultimaLeituraGPS.get(String(q.user.id)) || 0) < 4 * 60 * 1000) return r.json({ skipped: true });
+  ultimaLeituraGPS.set(String(q.user.id), agora);
+  try {
+    const local = await (filaLugares = filaLugares.catch(() => {}).then(async () => {
+      const espera = Math.max(0, 1100 - (Date.now() - ultimoPedidoDeMapa));
+      if (espera) await new Promise(resolve => setTimeout(resolve, espera));
+      ultimoPedidoDeMapa = Date.now();
+      const url = new URL('https://nominatim.openstreetmap.org/reverse');
+      url.search = new URLSearchParams({ lat: String(latitude), lon: String(longitude), format: 'jsonv2', zoom: '16', addressdetails: '1' }).toString();
+      const response = await fetch(url, {
+        headers: { 'Accept-Language': 'pt-BR,pt;q=0.9', 'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)', 'Referer': 'https://lembre-web.onrender.com/' },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!response.ok) throw new Error('Não consegui identificar o local agora.');
+      return response.json();
+    }));
+    if (!local.display_name) return r.json({ skipped: true });
+    const dados = formatarResultadoLugar(local);
+    const destination = [dados.logradouro, dados.bairro, dados.cidade].filter((item, index, lista) => item && lista.indexOf(item) === index).join(', ').slice(0, 180) || dados.nome;
+    const destinationHash = crypto.createHash('sha256').update(destination.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR')).digest('hex');
+    await db.execute('DELETE FROM routine_location_visits WHERE user_id=? AND last_seen < DATE_SUB(NOW(),INTERVAL 90 DAY)', [q.user.id]);
+    const [existente] = await db.execute('SELECT id,last_suggested_at,visit_count FROM routine_location_visits WHERE user_id=? AND destination_hash=?', [q.user.id, destinationHash]);
+    const jaSugerido = existente[0]?.last_suggested_at && Date.now() - new Date(existente[0].last_suggested_at).getTime() < 24 * 60 * 60 * 1000;
+    await db.execute(
+      `INSERT INTO routine_location_visits(user_id,destination,destination_hash) VALUES(?,?,?)
+       ON DUPLICATE KEY UPDATE
+       visit_count=IF(last_seen < DATE_SUB(NOW(),INTERVAL 6 HOUR),visit_count+1,visit_count),
+       destination=VALUES(destination),
+       last_seen=IF(last_seen < DATE_SUB(NOW(),INTERVAL 6 HOUR),NOW(),last_seen)`,
+      [q.user.id, destination, destinationHash]
+    );
+    if (jaSugerido) return r.json({ destination, items: [], ai: false, repeated: true });
+    const objects = (await db.execute('SELECT name,category,important FROM objects WHERE user_id=? ORDER BY important DESC,name LIMIT 80', [q.user.id]))[0];
+    let registeredItems = registeredSuggestions(destination, objects).map(item => item.name);
+    const nomesCadastrados = new Set(objects.map(item => String(item.name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()));
+    let items = [...new Set(suggestions(destination, objects))].filter(item => !nomesCadastrados.has(String(item).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim())).slice(0, 8);
+    let ai = false;
+    if (String(process.env.GEMINI_API_KEY || '').trim()) {
+      try { const sugestões = await gerarSugestoesGemini(destination, objects); items = sugestões.items; registeredItems = sugestões.registeredItems; ai = true; }
+      catch (error) { console.error('Sugestão GPS Gemini indisponível:', error.message); }
+    }
+    await db.execute('UPDATE routine_location_visits SET last_suggested_at=NOW() WHERE user_id=? AND destination_hash=?', [q.user.id, destinationHash]);
+    r.json({ destination, items, registeredItems, ai, repeated: false });
+  } catch (error) {
+    r.status(502).json({ error: error.message || 'Não consegui analisar o local detectado.' });
+  }
+});
+
 app.post('/routine/plans', auth, async (q, r) => {
   const destination = String(q.body.destination || '').trim();
   if (destination.length < 2 || destination.length > 180) return r.status(400).json({ error: 'Informe um destino entre 2 e 180 caracteres.' });
@@ -1354,13 +1430,22 @@ async function responderAssistente(usuario, mensagem) {
      GROUP BY destination ORDER BY frequencia DESC LIMIT 3`,
     [usuario]
   );
+  const [locaisVisitados] = await db.execute(
+    `SELECT destination,visit_count frequencia FROM routine_location_visits
+     WHERE user_id=? AND last_seen >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+     ORDER BY visit_count DESC,last_seen DESC LIMIT 8`,
+    [usuario]
+  );
   const essenciais = objetos.filter(item => item.important).map(item => item.name);
   const sinalFraco = objetos.filter(item => item.important && item.ble_uuid && !item.connected).map(item => item.name);
   const destino = pergunta.match(/(?:^|\s)(?:para|vou|indo para|destino|em|na|no|ao|à)\s+(?:(?:o|a|ao|à)\s+)?(.+?)[?!.]*$/i)?.[1];
 
   if (pergunta.includes('rotina') || pergunta.includes('costum')) {
-    return planos.length
-      ? `Pelos destinos que você escolheu salvar nos últimos 90 dias, você costuma planejar: ${planos.map(item => `${item.destination} (${item.frequencia} vezes)`).join(', ')}. Isso usa somente os planos registrados por você.`
+    return planos.length || locaisVisitados.length
+      ? [
+        planos.length ? `Destinos que você salvou: ${planos.map(item => `${item.destination} (${item.frequencia} planos)`).join(', ')}` : '',
+        locaisVisitados.length ? `Lugares frequentes identificados pelo GPS: ${locaisVisitados.map(item => `${item.destination} (${item.frequencia} visitas)`).join(', ')}` : '',
+      ].filter(Boolean).join('. ') + '. As sugestões são estimativas; confira se o local corresponde ao seu destino.'
       : 'Ainda não há destinos suficientes salvos para resumir sua rotina. No mapa, toque em “Salvar na rotina” depois de planejar uma saída.';
   }
   if (pergunta.includes('esquec') || pergunta.includes('falt')) {
@@ -1371,7 +1456,7 @@ async function responderAssistente(usuario, mensagem) {
     return essenciais.length ? `Seus itens essenciais são: ${essenciais.join(', ')}.` : 'Você ainda não marcou objetos como essenciais. Faça isso na tela Meus objetos.';
   }
   if (pergunta.includes('levar') || pergunta.includes('destino') || destino) {
-    const local = destino || planos[0]?.destination || '';
+    const local = destino || planos[0]?.destination || locaisVisitados[0]?.destination || '';
     const sugestoes = suggestions(local, objetos);
     return sugestoes.length ? `Para ${local || 'sua saída'}, confira: ${sugestoes.join(', ')}. Essas são sugestões gerais; ajuste a lista ao que você realmente precisa.` : `Não tenho sugestões específicas para “${local}” ainda. Confira seus itens essenciais e adicione outros pela lista de saída.`;
   }
@@ -1379,10 +1464,122 @@ async function responderAssistente(usuario, mensagem) {
   return `Entendi sua pergunta. Posso ajudar com seus ${objetos.length} objetos cadastrados, listas por destino e destinos salvos da sua rotina. Tente perguntar “O que conferir antes de sair?”`;
 }
 
+const instrucoesAssistenteIA = [
+  'Você é a assistente do Lembriê, um app brasileiro para lembrar objetos e planejar saídas.',
+  'Responda em português do Brasil, de forma acolhedora, clara e breve.',
+  'Ajude a escolher objetos para destinos, revisar itens essenciais, usar o mapa, rotina e Bluetooth.',
+  'Baseie recomendações no destino e na lista de objetos fornecida. Não invente itens cadastrados, localização atual, clima, horários ou estado de posse.',
+  'Sugestões são opcionais. Não diga que Bluetooth confirma que um objeto está com a pessoa; ele só indica sinal do chaveiro.',
+  'Para perguntas médicas, legais ou de emergência, não dê instruções profissionais; recomende procurar a fonte ou profissional adequado.',
+].join(' ');
+const ultimaChamadaIA = new Map();
+function podeChamarIA(usuario, intervaloMs = 4000) {
+  const chave = String(usuario);
+  const agora = Date.now();
+  if (agora - (ultimaChamadaIA.get(chave) || 0) < intervaloMs) return false;
+  ultimaChamadaIA.set(chave, agora);
+  return true;
+}
+
+async function gerarRespostaGemini(input) {
+  const chave = String(process.env.GEMINI_API_KEY || '').trim();
+  if (!chave) return null;
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': chave },
+    body: JSON.stringify({
+      model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+      input,
+      system_instruction: instrucoesAssistenteIA,
+      store: false,
+    }),
+    signal: AbortSignal.timeout(25000),
+  });
+  if (!response.ok) {
+    const detalhes = await response.json().catch(() => ({}));
+    throw new Error(detalhes.error?.message || `A IA respondeu com HTTP ${response.status}.`);
+  }
+  const dados = await response.json();
+  const texto = String(dados.output_text || (Array.isArray(dados.output)
+    ? dados.output.flatMap(item => item.content || []).filter(item => item.type === 'text').map(item => item.text).join('\n')
+    : '')).trim();
+  if (!texto) throw new Error('A IA não retornou uma resposta.');
+  return texto;
+}
+
+async function carregarContextoIA(usuario) {
+  const [objetos] = await db.execute(
+    `SELECT o.name,o.category,o.important,d.ble_uuid,d.connected
+     FROM objects o LEFT JOIN devices d ON d.object_id=o.id AND d.user_id=o.user_id
+     WHERE o.user_id=? ORDER BY o.important DESC,o.name LIMIT 80`,
+    [usuario]
+  );
+  const [planos] = await db.execute(
+    `SELECT destination,COUNT(*) frequencia FROM routine_plans
+     WHERE user_id=? AND planned_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+     GROUP BY destination ORDER BY frequencia DESC LIMIT 8`,
+    [usuario]
+  );
+  const [locaisVisitados] = await db.execute(
+    `SELECT destination,visit_count frequencia FROM routine_location_visits
+     WHERE user_id=? AND last_seen >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+     ORDER BY visit_count DESC,last_seen DESC LIMIT 8`,
+    [usuario]
+  );
+  return {
+    objetos: objetos.map(item => ({
+      nome: item.name,
+      categoria: item.category || 'Outros',
+      essencial: Boolean(item.important),
+      chaveiroAssociado: Boolean(item.ble_uuid),
+      chaveiroConectado: Boolean(item.connected),
+    })),
+    destinosSalvos: planos.map(item => ({ nome: item.destination, planos: Number(item.frequencia) })),
+    locaisFrequentadosDetectados: locaisVisitados.map(item => ({ nome: item.destination, visitas: Number(item.frequencia) })),
+  };
+}
+
+async function gerarSugestoesGemini(destination, objects) {
+  const resposta = await gerarRespostaGemini(JSON.stringify({
+    tarefa: 'Ajude a montar uma lista para o destino. Primeiro escolha objetos cadastrados que fazem sentido levar. Depois sugira itens úteis que ainda não foram cadastrados. Evite presumir clima ou planos específicos.',
+    destino: destination,
+    objetosCadastrados: objects.map(item => ({ nome: item.name, categoria: item.category || 'Outros', essencial: Boolean(item.important) })),
+    formato: 'Retorne somente JSON válido no formato {"registeredItems":["nome exatamente como cadastrado"],"extraItems":["item novo"]}. Em registeredItems use somente nomes exatos da lista enviada; limite cada lista a 6 nomes curtos em português.',
+  }));
+  const trechoJson = resposta.match(/\{[\s\S]*\}/)?.[0];
+  const geradas = trechoJson ? JSON.parse(trechoJson) : {};
+  if (!Array.isArray(geradas.registeredItems) || !Array.isArray(geradas.extraItems)) throw new Error('Formato de recomendações inválido.');
+  const normalizar = valor => String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+  const nomesCadastrados = new Map(objects.map(item => [normalizar(item.name), item.name]));
+  const registeredItems = [...new Set(geradas.registeredItems.map(item => nomesCadastrados.get(normalizar(item))).filter(Boolean))].slice(0, 6);
+  const items = [...new Set(geradas.extraItems.map(item => String(item).trim()).filter(item => item.length > 1 && item.length < 80 && !nomesCadastrados.has(normalizar(item))))].slice(0, 6);
+  if (!registeredItems.length && !items.length) throw new Error('A IA não encontrou sugestões neste momento.');
+  return { registeredItems, items };
+}
+
+app.get('/assistant/status', auth, (_q, r) => {
+  r.json({ enabled: Boolean(String(process.env.GEMINI_API_KEY || '').trim()), provider: 'Gemini' });
+});
+
 app.post('/assistant', auth, async (q, r) => {
   const mensagem = String(q.body.message || '').trim();
   if (!mensagem || mensagem.length > 500) return r.status(400).json({ error: 'Escreva uma mensagem de até 500 caracteres.' });
-  r.json({ answer: await responderAssistente(q.user.id, mensagem) });
+  const historico = Array.isArray(q.body.history) ? q.body.history
+    .filter(item => item && ['user', 'assistant'].includes(item.role) && typeof item.text === 'string')
+    .slice(-8)
+    .map(item => ({ papel: item.role === 'user' ? 'pessoa' : 'assistente', texto: item.text.slice(0, 500) })) : [];
+  const contexto = await carregarContextoIA(q.user.id);
+  const prompt = JSON.stringify({ contextoDaConta: contexto, conversaRecente: historico, perguntaAtual: mensagem });
+  if (String(process.env.GEMINI_API_KEY || '').trim()) {
+    if (!podeChamarIA(q.user.id)) return r.status(429).json({ error: 'Aguarde alguns segundos antes de enviar outra pergunta.' });
+    try {
+      const answer = await gerarRespostaGemini(prompt);
+      return r.json({ answer, ai: true });
+    } catch (error) {
+      console.error('Assistente Gemini indisponível:', error.message);
+    }
+  }
+  r.json({ answer: await responderAssistente(q.user.id, mensagem), ai: false });
 });
 
 app.get('/assistant', auth, async (q, r) => {
@@ -1454,6 +1651,25 @@ app.get('/recommendations', auth, async (q, r) => {
       image_data: object.image_data || null,
     }))
   });
+});
+
+app.post('/recommendations/ai', auth, async (q, r) => {
+  const destination = String(q.body.destination || '').trim();
+  if (destination.length < 2 || destination.length > 180) return r.status(400).json({ error: 'Informe um destino entre 2 e 180 caracteres.' });
+  const objects = (await db.execute('SELECT name,category,important FROM objects WHERE user_id=? ORDER BY important DESC,name LIMIT 80', [q.user.id]))[0];
+  const base = [...new Set(suggestions(destination, objects))].slice(0, 12);
+  const correspondentes = registeredSuggestions(destination, objects).map(item => item.name);
+  const normalizar = valor => String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim();
+  const nomes = new Set(objects.map(item => normalizar(item.name)));
+  if (!String(process.env.GEMINI_API_KEY || '').trim()) return r.json({ destination, registeredItems: correspondentes, items: base.filter(item => !nomes.has(normalizar(item))), ai: false });
+  if (!podeChamarIA(q.user.id)) return r.status(429).json({ error: 'Aguarde alguns segundos antes de pedir novas sugestões.' });
+  try {
+    const sugestões = await gerarSugestoesGemini(destination, objects);
+    r.json({ destination, ...sugestões, ai: true });
+  } catch (error) {
+    console.error('Sugestões Gemini indisponíveis:', error.message);
+    r.json({ destination, registeredItems: correspondentes, items: base.filter(item => !nomes.has(normalizar(item))), ai: false });
+  }
 });
 
 app.get('/postal-codes/lookup', auth, async (q, r) => {

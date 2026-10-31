@@ -1,9 +1,10 @@
 import estilos from './estilos/App.estilos';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable,  Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Linking, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TelaAutenticacao from './telas/TelaAutenticacao';
 import TelaInicio from './telas/TelaInicio';
@@ -14,6 +15,7 @@ import TelaConfiguracoes from './telas/TelaConfiguracoes';
 import TelaHistorico from './telas/TelaHistorico';
 import TelaMapaRotina from './telas/TelaMapaRotina';
 import TelaPerfil from './telas/TelaPerfil';
+import TelaAssistente from './telas/TelaAssistente';
 import { cores } from './tema';
 
 const endereçoDaApi = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' ? '' : Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000');
@@ -38,6 +40,8 @@ export default function App() {
   const [salvandoPreferências, definirSalvandoPreferências] = useState(false);
   const [saindo, definirSaindo] = useState(false);
   const [notificaçãoWeb, definirNotificaçãoWeb] = useState('');
+  const [permissaoLocalizacao, definirPermissaoLocalizacao] = useState<'verificando' | 'permitida' | 'negada'>('verificando');
+  const [sugestaoGPS, definirSugestaoGPS] = useState(null);
   const temporizadorNotificação = useRef<any>(null);
 
   useEffect(() => {
@@ -98,6 +102,69 @@ export default function App() {
     return dados;
   }, [token]);
 
+  useEffect(() => {
+    if (!token) return;
+    const inscrição = AppState.addEventListener('change', estado => {
+      if (estado !== 'active') return;
+      Location.getForegroundPermissionsAsync()
+        .then(permissão => definirPermissaoLocalizacao(permissão.status === 'granted' ? 'permitida' : 'negada'))
+        .catch(() => definirPermissaoLocalizacao('negada'));
+    });
+    return () => inscrição.remove();
+  }, [token]);
+
+  async function solicitarPermissaoLocalizacao() {
+    definirPermissaoLocalizacao('verificando');
+    try {
+      const permissão = await Location.requestForegroundPermissionsAsync();
+      definirPermissaoLocalizacao(permissão.status === 'granted' ? 'permitida' : 'negada');
+    } catch {
+      definirPermissaoLocalizacao('negada');
+    }
+  }
+
+  useEffect(() => {
+    let ativo = true;
+    if (!token) {
+      definirPermissaoLocalizacao('verificando');
+      definirSugestaoGPS(null);
+      return () => { ativo = false; };
+    }
+    Location.getForegroundPermissionsAsync()
+      .then(permissão => {
+        if (!ativo) return;
+        if (permissão.status === 'granted') definirPermissaoLocalizacao('permitida');
+        else solicitarPermissaoLocalizacao();
+      })
+      .catch(() => { if (ativo) definirPermissaoLocalizacao('negada'); });
+    return () => { ativo = false; };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || permissaoLocalizacao !== 'permitida') return;
+    let ativo = true;
+    let ultimaConsulta = 0;
+    let assinatura: Location.LocationSubscription | null = null;
+    Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.Balanced, timeInterval: 5 * 60 * 1000, distanceInterval: 300 },
+      posição => {
+        if (!ativo || Date.now() - ultimaConsulta < 4 * 60 * 1000) return;
+        if (posição.coords.accuracy != null && posição.coords.accuracy > 1200) return;
+        ultimaConsulta = Date.now();
+        chamarApi('/routine/location', {
+          method: 'POST',
+          body: JSON.stringify({ latitude: posição.coords.latitude, longitude: posição.coords.longitude }),
+        }).then(resultado => {
+          if (ativo && resultado.destination) definirSugestaoGPS(resultado);
+        }).catch(() => {});
+      }
+    ).then(resultado => {
+      if (ativo) assinatura = resultado;
+      else resultado.remove();
+    }).catch(() => {});
+    return () => { ativo = false; assinatura?.remove(); };
+  }, [token, permissaoLocalizacao, chamarApi]);
+
   const carregarDados = useCallback(async (silencioso = false) => {
     if (!token) return;
     if (!silencioso) definirAtualizando(true);
@@ -129,8 +196,8 @@ export default function App() {
   }, [token, chamarApi]);
 
   useEffect(() => {
-    if (token) carregarDados(true);
-  }, [token, carregarDados]);
+    if (token && permissaoLocalizacao === 'permitida') carregarDados(true);
+  }, [token, permissaoLocalizacao, carregarDados]);
 
   function notificar(mensagem) {
     if (Platform.OS === 'web') {
@@ -324,9 +391,20 @@ export default function App() {
     return <SafeAreaProvider><SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={estilos.raiz}><StatusBar style="dark" /><TelaAutenticacao entrar={entrar} cadastrar={cadastrar} recuperarSenha={recuperarSenha} recuperarSenhaGoogle={recuperarSenhaGoogle} carregando={carregandoAutenticação} /></SafeAreaView></SafeAreaProvider>;
   }
 
+  if (permissaoLocalizacao !== 'permitida') {
+    return <SafeAreaProvider><SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={estilos.raiz}><StatusBar style="dark" /><View style={{ flex: 1, justifyContent: 'center', padding: 24, maxWidth: 520, width: '100%', alignSelf: 'center', gap: 14 }}>
+      <View style={{ width: 58, height: 58, borderRadius: 20, backgroundColor: cores.primarioClaro, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="location" size={29} color={cores.primario} /></View>
+      <Text style={{ color: cores.texto, fontSize: 24, fontWeight: '900' }}>Localização necessária</Text>
+      <Text style={{ color: cores.textoSuave, fontSize: 15, lineHeight: 23 }}>O Lembriê usa o GPS enquanto o app ou site estiver aberto para reconhecer lugares visitados e sugerir itens. As coordenadas não ficam salvas; o nome aproximado do local pode ser guardado para identificar lugares frequentes. A IA só recebe esse nome e seus objetos cadastrados quando estiver ativada.</Text>
+      {permissaoLocalizacao === 'verificando' ? <ActivityIndicator size="small" color={cores.primario} /> : <Pressable accessibilityRole="button" onPress={solicitarPermissaoLocalizacao} style={{ minHeight: 50, paddingHorizontal: 16, borderRadius: 14, backgroundColor: cores.primario, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: cores.branco, fontWeight: '900' }}>Permitir localização e continuar</Text></Pressable>}
+      {permissaoLocalizacao === 'negada' ? <Pressable accessibilityRole="button" onPress={() => { if (Platform.OS !== 'web') Linking.openSettings(); }}><Text style={{ color: cores.primario, fontSize: 13, fontWeight: '800' }}>{Platform.OS === 'web' ? 'Altere a permissão de localização nas configurações do site no navegador e tente novamente.' : 'Abrir configurações do aparelho'}</Text></Pressable> : null}
+      <Pressable accessibilityRole="button" onPress={sairDaConta} style={{ paddingVertical: 12 }}><Text style={{ color: cores.textoSuave, textAlign: 'center' }}>Sair da conta</Text></Pressable>
+    </View></SafeAreaView></SafeAreaProvider>;
+  }
+
   let conteúdo;
   if (tela === 'inicio') {
-    conteúdo = <TelaInicio perfil={perfil} objetos={objetos} eventos={eventos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} />;
+    conteúdo = <TelaInicio perfil={perfil} objetos={objetos} eventos={eventos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} sugestaoGPS={sugestaoGPS} />;
   } else if (tela === 'objetos') {
     conteúdo = <TelaObjetos objetos={objetos} definirObjetos={definirObjetos} api={chamarApi} categoriaInicial={categoriaInicial} notificar={notificar} />;
   } else if (tela === 'bluetooth') {
@@ -337,6 +415,8 @@ export default function App() {
     conteúdo = <TelaMapaRotina api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} abrirObjetos={() => abrirTela('objetos')} notificar={notificar} atualizarDados={() => carregarDados(true)} />;
   } else if (tela === 'perfil') {
     conteúdo = <TelaPerfil perfil={perfil} salvarPerfil={salvarPerfil} solicitarVerificacaoEmail={solicitarVerificacaoEmail} alterarSenha={alterarSenha} recuperarSenha={recuperarSenha} notificar={notificar} />;
+  } else if (tela === 'assistente') {
+    conteúdo = <TelaAssistente api={chamarApi} />;
   } else if (tela === 'historico') {
     conteúdo = <TelaHistorico eventos={eventos} />;
   } else {
@@ -345,7 +425,7 @@ export default function App() {
 
   const título = {
     inicio: 'Início', objetos: 'Meus objetos', bluetooth: 'Bluetooth', saida: 'Antes de sair',
-    historico: 'Histórico', configuracoes: 'Configurações', mapa: 'Mapa e rotina', perfil: 'Meu perfil',
+    historico: 'Histórico', configuracoes: 'Configurações', mapa: 'Mapa e rotina', perfil: 'Meu perfil', assistente: 'Ajuda com IA',
   }[tela] || 'Lembriê';
 
   return (
@@ -381,7 +461,7 @@ export default function App() {
             <ItemNavegação ativo={tela === 'objetos'} ícone="cube-outline" íconeAtivo="cube" rótulo="Objetos" aoPressionar={() => abrirTela('objetos')} />
             <ItemNavegação ativo={tela === 'bluetooth'} ícone="bluetooth-outline" íconeAtivo="bluetooth" rótulo="Bluetooth" aoPressionar={() => abrirTela('bluetooth')} />
             <ItemNavegação ativo={tela === 'saida'} ícone="checkbox-outline" íconeAtivo="checkbox" rótulo="Saída" aoPressionar={() => abrirTela('saida')} />
-            <ItemNavegação ativo={menuAberto || ['mapa', 'historico', 'configuracoes', 'perfil'].includes(tela)} ícone="grid-outline" íconeAtivo="grid" rótulo="Mais" aoPressionar={() => definirMenuAberto(true)} />
+            <ItemNavegação ativo={menuAberto || ['mapa', 'historico', 'configuracoes', 'perfil', 'assistente'].includes(tela)} ícone="grid-outline" íconeAtivo="grid" rótulo="Mais" aoPressionar={() => definirMenuAberto(true)} />
           </View>
         </SafeAreaView>
 
@@ -392,6 +472,7 @@ export default function App() {
               <View style={estilos.alçaMenu} />
               <View style={estilos.cabeçalhoMenu}><View><Text style={estilos.tituloMenu}>Mais opções</Text><Text style={estilos.subtituloMenu}>{perfil?.name || perfil?.email || 'Sua conta'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Fechar menu" onPress={() => definirMenuAberto(false)} style={estilos.fecharMenu}><Ionicons name="close" size={20} color={cores.texto} /></Pressable></View>
               <View style={estilos.listaMenu}>
+                <ItemMenu ativo={tela === 'assistente'} ícone="sparkles-outline" título="Ajuda com IA" texto="Tire dúvidas e peça sugestões para o destino" aoPressionar={() => abrirTela('assistente')} />
                 <ItemMenu ativo={tela === 'mapa'} ícone="map-outline" título="Mapa e rotina" texto="Planeje um destino e seus itens" aoPressionar={() => abrirTela('mapa')} />
                 <ItemMenu ativo={tela === 'historico'} ícone="time-outline" título="Histórico" texto="Atividades recentes" aoPressionar={() => abrirTela('historico')} />
                 <ItemMenu ativo={tela === 'perfil'} ícone="person-circle-outline" título="Meu perfil" texto="Atualize seus dados e senha" aoPressionar={() => abrirTela('perfil')} />

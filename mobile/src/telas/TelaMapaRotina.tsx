@@ -17,6 +17,10 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
   const [selecionado, definirSelecionado] = useState(null);
   const [sugestoes, definirSugestoes] = useState([]);
   const [objetosSugeridos, definirObjetosSugeridos] = useState([]);
+  const [sugestoesIA, definirSugestoesIA] = useState([]);
+  const [objetosRecomendadosIA, definirObjetosRecomendadosIA] = useState([]);
+  const [gerandoSugestoesIA, definirGerandoSugestoesIA] = useState(false);
+  const [respostaIAAtiva, definirRespostaIAAtiva] = useState(null);
   const [objetosCadastrados, definirObjetosCadastrados] = useState([]);
   const [objetosSelecionados, definirObjetosSelecionados] = useState([]);
   const [conferindoSaida, definirConferindoSaida] = useState(false);
@@ -93,6 +97,9 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
   async function escolherLocal(local) {
     buscaPontoAtual.current += 1;
     definirSelecionado(local);
+    definirSugestoesIA([]);
+    definirObjetosRecomendadosIA([]);
+    definirRespostaIAAtiva(null);
     definirLocais([]);
     definirCepsDoEndereco(local.cep ? [{ cep: local.cep, bairro: local.bairro || '' }] : []);
     definirErro('');
@@ -129,6 +136,23 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       definirObjetosCadastrados([]);
       definirObjetosSelecionados([]);
       definirErro('O local foi selecionado, mas não consegui carregar seus objetos. Tente novamente.');
+    }
+  }
+
+  async function sugerirItensComIA() {
+    if (!selecionado) return;
+    definirGerandoSugestoesIA(true);
+    definirErro('');
+    try {
+      const dados = await api('/recommendations/ai', { method: 'POST', body: JSON.stringify({ destination: selecionado.nome }) });
+      definirSugestoesIA(Array.isArray(dados.items) ? dados.items : []);
+      definirObjetosRecomendadosIA(Array.isArray(dados.registeredItems) ? dados.registeredItems : []);
+      definirRespostaIAAtiva(dados.ai === true);
+      if (!dados.items?.length && !dados.registeredItems?.length) definirErro('Não encontrei sugestões para esse destino. Tente perguntar ao assistente.');
+    } catch (falha) {
+      definirErro(falha.message || 'Não consegui gerar sugestões agora. Tente novamente.');
+    } finally {
+      definirGerandoSugestoesIA(false);
     }
   }
 
@@ -226,6 +250,9 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       longitude,
     };
     definirSelecionado(ponto);
+    definirSugestoesIA([]);
+    definirObjetosRecomendadosIA([]);
+    definirRespostaIAAtiva(null);
     definirCepsDoEndereco([]);
     definirLocais([]);
     definirSugestoes([]);
@@ -292,6 +319,22 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
             <Text style={estilos.notaSugestões}>Cadastre seus objetos para receber sugestões personalizadas e montar sua lista de saída.</Text>
             <Botao título="Cadastrar objetos" secundário aoPressionar={abrirObjetos} />
           </>}
+          <Pressable accessibilityRole="button" onPress={sugerirItensComIA} disabled={gerandoSugestoesIA} style={estilos.botaoLocalização}>
+            {gerandoSugestoesIA ? <ActivityIndicator size="small" color={cores.primario} /> : <Ionicons name="sparkles-outline" size={17} color={cores.primario} />}
+            <Text style={estilos.textoLocalização}>{gerandoSugestoesIA ? 'Preparando sugestões…' : 'Sugerir itens com IA'}</Text>
+          </Pressable>
+          {sugestoesIA.length ? <View style={estilos.listaSugestões}>
+            <Text style={estilos.notaSugestões}>{respostaIAAtiva ? 'Sugestões personalizadas pela IA Gemini. Confira se fazem sentido para seus planos.' : 'Sugestões gerais do Lembriê. A IA ainda precisa ser ativada no servidor.'}</Text>
+            {sugestoesIA.map(item => <View key={item} style={estilos.sugestão}><Ionicons name="sparkles-outline" size={17} color={cores.primario} /><Text style={estilos.textoSugestão}>{item}</Text></View>)}
+          </View> : null}
+          {objetosRecomendadosIA.length ? <View style={estilos.listaSugestões}>
+            <Text style={estilos.notaSugestões}>{respostaIAAtiva ? 'Itens da sua lista que a IA recomenda para este destino:' : 'Itens da sua lista relacionados ao destino:'} {objetosRecomendadosIA.join(', ')}.</Text>
+            <Pressable accessibilityRole="button" onPress={() => {
+              const ids = objetosCadastrados.filter(item => objetosRecomendadosIA.some(nome => nome.toLocaleLowerCase('pt-BR') === String(item.name).toLocaleLowerCase('pt-BR'))).map(item => String(item.id));
+              definirObjetosSelecionados(atuais => [...new Set([...atuais, ...ids])]);
+              definirResultadoConferencia(null);
+            }} style={estilos.botaoLocalização}><Ionicons name="checkmark-circle-outline" size={17} color={cores.primario} /><Text style={estilos.textoLocalização}>Adicionar à lista de saída</Text></Pressable>
+          </View> : null}
           {sugestoes.filter(item => !objetosSugeridos.some(objeto => objeto.name.toLocaleLowerCase('pt-BR') === item.toLocaleLowerCase('pt-BR'))).length ? <>
             <TituloSecao título={objetosSugeridos.length ? 'IDEIAS EXTRAS PARA O DESTINO' : 'IDEIAS PARA O DESTINO'} />
             <View style={estilos.listaSugestões}>{sugestoes.filter(item => !objetosSugeridos.some(objeto => objeto.name.toLocaleLowerCase('pt-BR') === item.toLocaleLowerCase('pt-BR'))).map(item => <View key={item} style={estilos.sugestão}><Ionicons name="checkmark-circle-outline" size={17} color={cores.verde} /><Text style={estilos.textoSugestão}>{item}</Text></View>)}</View>

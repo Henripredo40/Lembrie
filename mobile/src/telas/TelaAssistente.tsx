@@ -1,16 +1,23 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { cores } from '../tema';
 import estilos from '../estilos/TelaAssistente.estilos';
 
-const perguntasRápidas = ['O que levar para o trabalho?', 'Quais são meus itens essenciais?', 'O que posso ter esquecido?'];
+const perguntasRápidas = ['O que levar para o trabalho?', 'Quais lugares eu costumo visitar?', 'Quais são meus itens essenciais?'];
 
 export default function TelaAssistente({ api }) {
-  const [mensagens, definirMensagens] = useState([{ id: 'inicio', papel: 'assistente', texto: 'Olá! Posso ajudar com seus objetos, listas de saída e destinos salvos. O que você quer saber?' }]);
+  const [mensagens, definirMensagens] = useState([{ id: 'inicio', papel: 'assistente', texto: 'Olá! Posso sugerir o que levar para um local, consultar seus objetos e ajudar com sua rotina. O que você quer saber?' }]);
   const [texto, definirTexto] = useState('');
   const [enviando, definirEnviando] = useState(false);
+  const [iaAtiva, definirIaAtiva] = useState(null);
   const rolagem = useRef(null);
+
+  useEffect(() => {
+    let ativo = true;
+    api('/assistant/status').then(status => { if (ativo) definirIaAtiva(status.enabled === true); }).catch(() => { if (ativo) definirIaAtiva(false); });
+    return () => { ativo = false; };
+  }, [api]);
 
   async function enviar(pergunta = texto) {
     const mensagem = pergunta.trim();
@@ -19,7 +26,9 @@ export default function TelaAssistente({ api }) {
     definirMensagens(atual => [...atual, { id: String(Date.now()), papel: 'pessoa', texto: mensagem }]);
     definirEnviando(true);
     try {
-      const resposta = await api('/assistant', { method: 'POST', body: JSON.stringify({ message: mensagem }) });
+      const history = mensagens.filter(item => item.id !== 'inicio').slice(-8).map(item => ({ role: item.papel === 'pessoa' ? 'user' : 'assistant', text: item.texto }));
+      const resposta = await api('/assistant', { method: 'POST', body: JSON.stringify({ message: mensagem, history }) });
+      if (typeof resposta.ai === 'boolean') definirIaAtiva(resposta.ai);
       definirMensagens(atual => [...atual, { id: String(Date.now() + 1), papel: 'assistente', texto: resposta.answer }]);
     } catch (erro) {
       definirMensagens(atual => [...atual, { id: String(Date.now() + 1), papel: 'assistente', texto: erro.message || 'Não consegui responder agora. Confira a conexão e tente de novo.' }]);
@@ -34,7 +43,7 @@ export default function TelaAssistente({ api }) {
       <ScrollView ref={rolagem} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled" onContentSizeChange={() => rolagem.current?.scrollToEnd({ animated: true })}>
         <Text style={estilos.sobretitulo}>AJUDA PERSONALIZADA</Text>
         <Text style={estilos.titulo}>Converse com Lembriê</Text>
-        <Text style={estilos.subtitulo}>As respostas usam seus itens cadastrados e destinos salvos. Não são geradas por um serviço externo de inteligência artificial.</Text>
+        <Text style={estilos.subtitulo}>{iaAtiva === true ? 'IA Gemini ativa: posso considerar seus objetos e destinos salvos. Suas perguntas e esse contexto são enviados ao Google para gerar a resposta; o histórico não é guardado pela API do Gemini.' : iaAtiva === false ? 'Assistente especialista em objetos e destinos. A IA Gemini ainda não foi ativada no servidor; por enquanto, uso as respostas locais do Lembriê.' : 'Conferindo se a IA está disponível…'}</Text>
         <View style={estilos.perguntas}>
           {perguntasRápidas.map(pergunta => <Pressable key={pergunta} accessibilityRole="button" onPress={() => enviar(pergunta)} style={estilos.pergunta}><Text style={estilos.textoPergunta}>{pergunta}</Text><Ionicons name="arrow-forward" size={16} color={cores.primario} /></Pressable>)}
         </View>

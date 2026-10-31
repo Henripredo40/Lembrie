@@ -11,11 +11,11 @@ Aplicativo móvel em português para organizar objetos, planejar saídas e prepa
 - Lista de saída, sugestões de itens por destino, perfis salvos e histórico.
 - Mapa com busca de lugares, posição atual sob demanda e atribuição do OpenStreetMap.
 - Reconhecimento opcional de rotina baseado apenas nos destinos que a pessoa escolhe salvar.
-- Chat ligado aos objetos e destinos da conta, com respostas baseadas nas regras locais do aplicativo.
+- Chat contextual por IA (Gemini) e sugestões de itens por destino, com fallback local enquanto a chave do modelo não estiver configurada.
 
-O app não rastreia deslocamentos em segundo plano. A rotina registra um destino somente quando a pessoa toca em “Salvar destino na minha rotina”; desligar esse recurso apaga os destinos salvos. A busca de lugares e as coordenadas mostradas no mapa são enviadas ao OpenStreetMap. A visualização inclui a atribuição dos colaboradores.
+O Lembriê exige permissão de localização para uso após o login. Enquanto o app ou site estiver aberto, ele verifica a posição em intervalos e envia as coordenadas à API para identificar lugares; não executa rastreamento em segundo plano nem salva coordenadas. Guarda somente nomes aproximados dos locais visitados por até 90 dias para analisar frequência e sugerir itens. A busca de lugares e as coordenadas mostradas no mapa são enviadas ao OpenStreetMap. Quando Gemini estiver ativado, a pergunta, o destino e os nomes/categorias dos objetos são enviados ao Google; as chamadas usam `store:false` para não guardar histórico de interação no serviço. A visualização inclui a atribuição dos colaboradores.
 
-O chat não usa um serviço externo de inteligência artificial: responde com os objetos cadastrados, destinos salvos e sugestões do app. O resultado é contextual e não substitui informações profissionais ou de emergência.
+O assistente usa Gemini quando `GEMINI_API_KEY` está configurada no servidor. Crie uma chave em [Google AI Studio — API Keys](https://aistudio.google.com/app/apikey) e adicione-a como variável secreta no serviço `lembre-api` do Render. `GEMINI_MODEL` pode ser definido para escolher outro modelo compatível. Sem a chave, o app continua usando respostas e sugestões locais. O resultado é contextual e não substitui informações profissionais ou de emergência.
 
 ## Usabilidade e acessibilidade
 

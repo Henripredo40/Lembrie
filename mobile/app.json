@@ -22,7 +22,7 @@
       "bundleIdentifier": "com.chaveiroantiperda.app",
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Usamos Bluetooth para detectar os chaveiros.",
-        "NSLocationWhenInUseUsageDescription": "Sua localização atual é usada apenas quando você pede para mostrá-la no mapa."
+        "NSLocationWhenInUseUsageDescription": "O Lembriê usa sua localização enquanto o app está aberto para reconhecer lugares e sugerir o que levar."
       }
     },
     "extra": {
@@ -42,7 +42,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Permita o uso da localização enquanto utiliza o app para mostrar sua posição no mapa."
+          "locationWhenInUsePermission": "Permita o uso da localização enquanto o app está aberto para reconhecer lugares e sugerir itens."
         }
       ],
       [

@@ -87,6 +87,19 @@ CREATE TABLE IF NOT EXISTS routine_plans (
   INDEX ix_routine_user_date (user_id, planned_at)
 );
 
+CREATE TABLE IF NOT EXISTS routine_location_visits (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  user_id BIGINT NOT NULL,
+  destination VARCHAR(180) NOT NULL,
+  destination_hash CHAR(64) NOT NULL,
+  visit_count INT NOT NULL DEFAULT 1,
+  first_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_suggested_at DATETIME NULL,
+  UNIQUE KEY uq_location_visit (user_id, destination_hash),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS password_reset_codes (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL,

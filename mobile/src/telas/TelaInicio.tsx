@@ -11,7 +11,7 @@ import { formatarData } from '../utils/date';
 
 type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string }; rotina?: boolean };
 
-export default function TelaInicio({ perfil, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva }) {
+export default function TelaInicio({ perfil, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
   const [categoriasDaRotina, definirCategoriasDaRotina] = useState<string[]>([]);
 
   useEffect(() => {
@@ -84,6 +84,14 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
       </View>
 
       {erroConexao ? <Aviso ícone="cloud-offline-outline" tom="alerta" texto={erroConexao} /> : null}
+
+      {sugestaoGPS?.items?.length || sugestaoGPS?.registeredItems?.length ? <View style={estilos.cartaoSugestaoGPS}>
+        <View style={estilos.cabecalhoSugestaoGPS}><Ionicons name="sparkles" size={18} color={cores.primario} /><Text style={estilos.tituloSugestaoGPS}>Sugestão para este local</Text></View>
+        <Text style={estilos.textoSugestaoGPS}>{sugestaoGPS.destination}</Text>
+        {sugestaoGPS.registeredItems?.length ? <Text style={estilos.textoSugestaoGPS}>Da sua lista: {sugestaoGPS.registeredItems.join(', ')}.</Text> : null}
+        {sugestaoGPS.items?.length ? <Text style={estilos.textoSugestaoGPS}>Considere acrescentar: {sugestaoGPS.items.join(', ')}.</Text> : null}
+        <Text style={estilos.legendaSugestaoGPS}>{sugestaoGPS.ai ? 'Recomendação personalizada pela IA Gemini' : 'Sugestão local do Lembriê · IA ainda não configurada'}</Text>
+      </View> : null}
 
       <View style={estilos.busca}>
         <Ionicons name="search-outline" size={20} color={cores.textoSuave} />
