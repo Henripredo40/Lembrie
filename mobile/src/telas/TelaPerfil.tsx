@@ -5,7 +5,7 @@ import { Aviso, Botao, CampoTexto } from '../componentes/Elementos';
 import { cores } from '../tema';
 import estilos from '../estilos/TelaPerfil.estilos';
 
-export default function TelaPerfil({ perfil, salvarPerfil, solicitarVerificacaoEmail, alterarSenha, recuperarSenha, notificar }) {
+export default function TelaPerfil({ perfil, api, salvarPerfil, solicitarVerificacaoEmail, alterarSenha, recuperarSenha, notificar }) {
   const [nome, definirNome] = useState(perfil?.name || '');
   const [email, definirEmail] = useState(perfil?.email || '');
   const [senhaAtual, definirSenhaAtual] = useState('');
@@ -21,6 +21,28 @@ export default function TelaPerfil({ perfil, salvarPerfil, solicitarVerificacaoE
   const [salvandoSenha, definirSalvandoSenha] = useState(false);
   const [erroPerfil, definirErroPerfil] = useState('');
   const [erroSenha, definirErroSenha] = useState('');
+  const [seguranca, definirSeguranca] = useState(null);
+
+  useEffect(() => {
+    let ativo = true;
+    api('/me/security').then(dados => { if (ativo) definirSeguranca(dados); }).catch(() => {});
+    return () => { ativo = false; };
+  }, [api]);
+
+  function dataAcesso(valor) {
+    if (!valor) return 'Ainda não registrado';
+    const data = new Date(String(valor).replace(' ', 'T'));
+    return Number.isNaN(data.getTime()) ? 'Data indisponível' : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(data);
+  }
+
+  function duracaoSessao(segundos) {
+    const total = Math.max(0, Number(segundos) || 0);
+    if (total < 60) return 'menos de 1 minuto';
+    const minutos = Math.floor(total / 60);
+    const horas = Math.floor(minutos / 60);
+    const minutosRestantes = minutos % 60;
+    return horas ? `${horas} h ${minutosRestantes} min` : `${minutos} min`;
+  }
 
   useEffect(() => {
     if (!perfil) return;
@@ -144,6 +166,15 @@ export default function TelaPerfil({ perfil, salvarPerfil, solicitarVerificacaoE
         </> : null}
         {erroPerfil ? <Aviso ícone="alert-circle-outline" tom="alerta" texto={erroPerfil} /> : null}
         <Botao título={salvandoPerfil ? (verificacaoEmailPendente ? 'Confirmando e salvando...' : 'Salvando dados...') : verificacaoEmailPendente ? 'Confirmar e salvar perfil' : 'Salvar perfil'} ícone={verificacaoEmailPendente ? 'mail-outline' : 'save-outline'} carregando={salvandoPerfil} desativado={!perfil} aoPressionar={salvarDados} />
+      </View>
+      <View style={estilos.cartaoSeguranca}>
+        <View style={estilos.cabecalhoSeguranca}><View style={estilos.iconeSeguranca}><Ionicons name="shield-checkmark-outline" size={19} color={cores.primario} /></View><View style={estilos.textoSeguranca}><Text style={estilos.tituloSeguranca}>Acesso e segurança</Text><Text style={estilos.subtituloSeguranca}>Atividade recente desta conta</Text></View></View>
+        <View style={estilos.linhaSeguranca}><Text style={estilos.rotuloSeguranca}>Último login</Text><Text style={estilos.valorSeguranca}>{dataAcesso(seguranca?.last_login)}</Text></View>
+        {seguranca?.sessions?.[0] ? <>
+          <View style={estilos.linhaSeguranca}><Text style={estilos.rotuloSeguranca}>Aparelho</Text><Text style={estilos.valorSeguranca}>{seguranca.sessions[0].device_label}</Text></View>
+          <View style={estilos.linhaSeguranca}><Text style={estilos.rotuloSeguranca}>Tempo de uso nesta sessão</Text><Text style={estilos.valorSeguranca}>{duracaoSessao(seguranca.sessions[0].active_seconds)}{seguranca.sessions[0].active ? ' · em uso' : ''}</Text></View>
+        </> : <Text style={estilos.subtituloSeguranca}>O histórico de sessões aparecerá após o próximo acesso.</Text>}
+        <Text style={estilos.notaSeguranca}>O aparelho é identificado pelo modelo informado pelo sistema. O registro confirma o uso das credenciais da conta, mas não identifica a pessoa que estava com o aparelho. O tempo é aproximado e conta enquanto o app ou site está em uso.</Text>
       </View>
       <View style={estilos.cartaoSenha}>
         <View style={estilos.cabecalhoSenha}><View style={estilos.iconeSenha}><Ionicons name="lock-closed-outline" size={18} color={cores.primario} /></View><View style={estilos.textoSenha}><Text style={estilos.tituloSenha}>{recuperacaoEnviada ? 'Redefinir com código' : 'Alterar senha'}</Text><Text style={estilos.subtituloSenha}>{recuperacaoEnviada ? 'Informe o código enviado para ' + (perfil?.email || email) + '.' : 'Confirme sua senha atual para continuar.'}</Text></View></View>

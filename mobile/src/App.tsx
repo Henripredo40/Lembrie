@@ -21,6 +21,22 @@ import { cores } from './tema';
 const endereçoDaApi = process.env.EXPO_PUBLIC_API_URL || (Platform.OS === 'web' ? '' : Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000');
 const preferênciasIniciais = { notifications: true, routine_enabled: false, preventive_alerts: true, essential_only: false };
 const preferênciaAtiva = (valor) => valor === true || Number(valor) === 1;
+function identificarDispositivo() {
+  if (Platform.OS === 'android' || Platform.OS === 'ios') {
+    const constantes = Platform.constants as any;
+    const fabricante = String(constantes?.Manufacturer || constantes?.Brand || '').trim();
+    const modelo = String(constantes?.Model || '').trim();
+    const nomeModelo = [fabricante, modelo].filter((valor, índice, lista) => valor && lista.indexOf(valor) === índice).join(' ');
+    const plataforma = Platform.OS === 'android' ? 'Android' : 'iPhone/iPad';
+    return 'Aplicativo ' + (nomeModelo || plataforma) + ' (' + plataforma + ')';
+  }
+  if (typeof navigator === 'undefined') return 'Navegador';
+  const agente = navigator.userAgent || '';
+  const androidModelo = agente.match(/Android\s[^;]+;\s*([^;)]+)(?:\sBuild)?/i)?.[1]?.trim();
+  const sistema = /Android/i.test(agente) ? 'Android' : /iPhone|iPad/i.test(agente) ? 'iPhone/iPad' : /Windows/i.test(agente) ? 'Windows' : /Mac OS/i.test(agente) ? 'macOS' : /Linux/i.test(agente) ? 'Linux' : 'dispositivo';
+  const navegador = /Edg\//i.test(agente) ? 'Edge' : /Firefox\//i.test(agente) ? 'Firefox' : /Chrome\//i.test(agente) ? 'Chrome' : /Safari\//i.test(agente) ? 'Safari' : 'navegador';
+  return (androidModelo ? androidModelo + ' — ' : '') + navegador + ' em ' + sistema;
+}
 
 export default function App() {
   const [token, definirToken] = useState(null);
@@ -43,6 +59,7 @@ export default function App() {
   const [permissaoLocalizacao, definirPermissaoLocalizacao] = useState<'verificando' | 'permitida' | 'negada'>('verificando');
   const [sugestaoGPS, definirSugestaoGPS] = useState(null);
   const temporizadorNotificação = useRef<any>(null);
+  const sessãoConta = useRef<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -211,6 +228,7 @@ export default function App() {
 
   async function aceitarSessão(dados) {
     await AsyncStorage.setItem('token', dados.token);
+    if (dados.session_id) await AsyncStorage.setItem('account_session_id', String(dados.session_id));
     definirToken(dados.token);
     definirPerfil(dados.user || null);
     definirTela('inicio');
@@ -225,7 +243,7 @@ export default function App() {
     try {
       const dados = await chamarApi('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password: senha }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password: senha, device_label: identificarDispositivo() }),
       });
       await aceitarSessão(dados);
       return { ok: true };
@@ -244,7 +262,7 @@ export default function App() {
     try {
       const dados = await chamarApi('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ name: nome.trim(), email: email.trim().toLowerCase(), password: senha }),
+        body: JSON.stringify({ name: nome.trim(), email: email.trim().toLowerCase(), password: senha, device_label: identificarDispositivo() }),
       });
       await aceitarSessão(dados);
       return { ok: true };
@@ -340,6 +358,9 @@ export default function App() {
   async function sairDaConta() {
     const confirmar = async () => {
       definirSaindo(true);
+      if (sessãoConta.current) await chamarApi('/sessions/end', { method: 'POST', body: JSON.stringify({ session_id: sessãoConta.current }) }).catch(() => {});
+      sessãoConta.current = null;
+      await AsyncStorage.removeItem('account_session_id').catch(() => {});
       await AsyncStorage.removeItem('token').catch(() => {});
       definirToken(null);
       definirPerfil(null);
@@ -359,6 +380,47 @@ export default function App() {
       { text: 'Sair', style: 'destructive', onPress: confirmar },
     ]);
   }
+
+  useEffect(() => {
+    if (!token) { sessãoConta.current = null; return; }
+    let ativo = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let started = false;
+    let aguardando = false;
+    const visível = () => Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState === 'visible';
+    const atualizarSessão = async () => {
+      if (!ativo || aguardando || !visível() || !sessãoConta.current) return;
+      aguardando = true;
+      try { await chamarApi('/sessions/heartbeat', { method: 'POST', body: JSON.stringify({ session_id: sessãoConta.current }) }); }
+      catch {} finally { aguardando = false; }
+    };
+    const iniciar = async () => {
+      try {
+        let idSessão = await AsyncStorage.getItem('account_session_id');
+        if (!idSessão) {
+          const criada = await chamarApi('/sessions/start', { method: 'POST', body: JSON.stringify({ device_label: identificarDispositivo() }) });
+          idSessão = criada.session_id;
+          if (idSessão) await AsyncStorage.setItem('account_session_id', String(idSessão));
+        }
+        if (!ativo || !idSessão) return;
+        sessãoConta.current = idSessão;
+        started = true;
+        await atualizarSessão();
+        timer = setInterval(atualizarSessão, 60_000);
+      } catch {}
+    };
+    void iniciar();
+    const inscrição = AppState.addEventListener('change', estado => { if (estado === 'active') void atualizarSessão(); else void atualizarSessão(); });
+    const visibilidade = () => { if (visível()) void atualizarSessão(); else void atualizarSessão(); };
+    if (Platform.OS === 'web' && typeof document !== 'undefined') document.addEventListener('visibilitychange', visibilidade);
+    return () => {
+      ativo = false;
+      if (timer) clearInterval(timer);
+      inscrição.remove();
+      if (Platform.OS === 'web' && typeof document !== 'undefined') document.removeEventListener('visibilitychange', visibilidade);
+      if (started && sessãoConta.current) void chamarApi('/sessions/heartbeat', { method: 'POST', body: JSON.stringify({ session_id: sessãoConta.current }) }).catch(() => {});
+    };
+  }, [token, chamarApi]);
 
   async function salvarPreferências(novas) {
     const anteriores = preferências;
@@ -414,7 +476,7 @@ export default function App() {
   } else if (tela === 'mapa') {
     conteúdo = <TelaMapaRotina api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} abrirObjetos={() => abrirTela('objetos')} notificar={notificar} atualizarDados={() => carregarDados(true)} />;
   } else if (tela === 'perfil') {
-    conteúdo = <TelaPerfil perfil={perfil} salvarPerfil={salvarPerfil} solicitarVerificacaoEmail={solicitarVerificacaoEmail} alterarSenha={alterarSenha} recuperarSenha={recuperarSenha} notificar={notificar} />;
+    conteúdo = <TelaPerfil perfil={perfil} api={chamarApi} salvarPerfil={salvarPerfil} solicitarVerificacaoEmail={solicitarVerificacaoEmail} alterarSenha={alterarSenha} recuperarSenha={recuperarSenha} notificar={notificar} />;
   } else if (tela === 'assistente') {
     conteúdo = <TelaAssistente api={chamarApi} />;
   } else if (tela === 'historico') {

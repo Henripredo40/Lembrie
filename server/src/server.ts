@@ -42,6 +42,15 @@ let filaLugares: Promise<unknown> = Promise.resolve();
 
 const validarEmail = valor => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(valor || '').trim());
 const resumirHash = valor => crypto.createHash('sha256').update(valor).digest('hex');
+const rotuloDispositivo = valor => {
+  const rotulo = String(valor || '').replace(/[<>\r\n]/g, '').trim().slice(0, 120);
+  return rotulo || 'Dispositivo não identificado';
+};
+async function criarSessaoConta(userId, deviceLabel) {
+  const sessionId = crypto.randomUUID();
+  await db.execute('INSERT INTO account_sessions(id,user_id,device_label) VALUES(?,?,?)', [sessionId, userId, rotuloDispositivo(deviceLabel)]);
+  return sessionId;
+}
 const emailConfigurado = () => Boolean(
   (process.env.RESEND_API_KEY && process.env.RESEND_FROM) ||
   (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASSWORD)
@@ -104,6 +113,17 @@ async function init() {
   }
 
   await ensureColumn('users', 'last_login', 'TIMESTAMP NULL DEFAULT NULL');
+  await db.execute(`CREATE TABLE IF NOT EXISTS account_sessions(
+    id CHAR(36) PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    device_label VARCHAR(120) NOT NULL DEFAULT 'Dispositivo não identificado',
+    started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_activity_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ended_at DATETIME NULL,
+    active_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+    INDEX idx_account_sessions_user_started(user_id, started_at),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`);
   await ensureColumn('settings', 'preventive_alerts', 'BOOLEAN DEFAULT TRUE');
   await ensureColumn('settings', 'essential_only', 'BOOLEAN DEFAULT FALSE');
   await ensureColumn('settings', 'routine_consent_at', 'DATETIME NULL');
@@ -262,11 +282,14 @@ app.post('/auth/register', async (q, r) => {
       'INSERT INTO settings(user_id,routine_enabled,routine_consent_at) VALUES(?,FALSE,NOW())',
       [x.insertId]
     );
+    await db.execute('UPDATE users SET last_login=NOW() WHERE id=?', [x.insertId]);
+    const sessionId = await criarSessaoConta(x.insertId, q.body.device_label);
 
     r.status(201).json({
       token: jwt.sign(
         {
-          id: x.insertId
+          id: x.insertId,
+          sid: sessionId
         },
         secret,
         {
@@ -278,8 +301,9 @@ app.post('/auth/register', async (q, r) => {
         id: x.insertId,
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        last_login: null
-      }
+        last_login: new Date()
+      },
+      session_id: sessionId
     });
   } catch (e) {
     r.status(400).json({
@@ -321,6 +345,7 @@ app.post('/auth/login', async (q, r) => {
       'UPDATE users SET last_login = NOW() WHERE id = ?',
       [x[0].id]
     );
+    const sessionId = await criarSessaoConta(x[0].id, q.body.device_label);
 
     
     const [updated] = await db.execute(
@@ -331,7 +356,8 @@ app.post('/auth/login', async (q, r) => {
     r.json({
       token: jwt.sign(
         {
-          id: x[0].id
+          id: x[0].id,
+          sid: sessionId
         },
         secret,
         {
@@ -345,7 +371,8 @@ app.post('/auth/login', async (q, r) => {
         email: updated[0].email,
         created_at: updated[0].created_at,
         last_login: updated[0].last_login
-      }
+      },
+      session_id: sessionId
     });
   } catch (e) {
     console.error('Erro no login:', e);
@@ -505,6 +532,60 @@ app.get('/me', auth, async (q, r) => {
     r.status(500).json({
       error: 'Não foi possível carregar o usuário'
     });
+  }
+});
+
+app.get('/me/security', auth, async (q, r) => {
+  try {
+    const [users] = await db.execute('SELECT last_login FROM users WHERE id=? LIMIT 1', [q.user.id]);
+    const [sessions] = await db.execute(`SELECT id,device_label,started_at,last_activity_at,ended_at,active_seconds,
+      (ended_at IS NULL AND last_activity_at>=DATE_SUB(NOW(),INTERVAL 2 MINUTE)) AS active
+      FROM account_sessions WHERE user_id=? ORDER BY started_at DESC LIMIT 10`, [q.user.id]);
+    r.json({ last_login: users[0]?.last_login || null, sessions });
+  } catch (error) {
+    console.error('Falha ao carregar histórico de acesso:', error);
+    r.status(500).json({ error: 'Não foi possível carregar os dados de segurança.' });
+  }
+});
+
+app.post('/sessions/start', auth, async (q, r) => {
+  try {
+    const sessionId = await criarSessaoConta(q.user.id, q.body.device_label);
+    r.status(201).json({ session_id: sessionId });
+  } catch (error) {
+    console.error('Falha ao iniciar sessão monitorada:', error);
+    r.status(500).json({ error: 'Não foi possível registrar esta sessão.' });
+  }
+});
+
+app.post('/sessions/heartbeat', auth, async (q, r) => {
+  const sessionId = String(q.body.session_id || '');
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return r.status(400).json({ error: 'Sessão inválida.' });
+  try {
+    const [result] = await db.execute(`UPDATE account_sessions
+      SET active_seconds=active_seconds+LEAST(90,GREATEST(0,TIMESTAMPDIFF(SECOND,last_activity_at,NOW()))),
+          last_activity_at=NOW()
+      WHERE id=? AND user_id=? AND ended_at IS NULL`, [sessionId, q.user.id]);
+    if (!result.affectedRows) return r.status(404).json({ error: 'Sessão não encontrada ou encerrada.' });
+    r.json({ ok: true });
+  } catch (error) {
+    console.error('Falha ao atualizar atividade da sessão:', error);
+    r.status(500).json({ error: 'Não foi possível atualizar a sessão.' });
+  }
+});
+
+app.post('/sessions/end', auth, async (q, r) => {
+  const sessionId = String(q.body.session_id || '');
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return r.status(400).json({ error: 'Sessão inválida.' });
+  try {
+    await db.execute(`UPDATE account_sessions
+      SET active_seconds=active_seconds+LEAST(90,GREATEST(0,TIMESTAMPDIFF(SECOND,last_activity_at,NOW()))),
+          last_activity_at=NOW(),ended_at=NOW()
+      WHERE id=? AND user_id=? AND ended_at IS NULL`, [sessionId, q.user.id]);
+    r.json({ ok: true });
+  } catch (error) {
+    console.error('Falha ao encerrar sessão:', error);
+    r.status(500).json({ error: 'Não foi possível encerrar a sessão.' });
   }
 });
 

@@ -10,6 +10,18 @@ CREATE TABLE IF NOT EXISTS users (
   last_login TIMESTAMP NULL
 );
 
+CREATE TABLE IF NOT EXISTS account_sessions (
+  id CHAR(36) PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  device_label VARCHAR(120) NOT NULL DEFAULT 'Dispositivo não identificado',
+  started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_activity_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ended_at DATETIME NULL,
+  active_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+  INDEX idx_account_sessions_user_started(user_id, started_at),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS objects (
   id BIGINT PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT NOT NULL,
