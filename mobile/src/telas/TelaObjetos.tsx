@@ -126,14 +126,14 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
 
         <CampoTexto rótulo="Nome do objeto" value={nome} onChangeText={(valor) => { setNome(valor); setErroFormulario(''); }} placeholder="Ex.: Chaves de casa" maxLength={120} returnKeyType="done" />
         <Text style={estilos.rotuloCategoria}>Categoria</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.listaCategorias}>
+        <View style={estilos.gradeCategorias}>
           {categoriasDeObjeto.map((opção) => (
             <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoria === opção.nome }} onPress={() => setCategoria(opção.nome)} style={[estilos.opcaoCategoria, categoria === opção.nome && estilos.opcaoCategoriaAtiva]}>
               <MaterialCommunityIcons name={opção.ícone} size={16} color={categoria === opção.nome ? cores.primario : cores.textoSuave} />
               <Text style={[estilos.textoCategoria, categoria === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
 
         <View style={estilos.linhaEssencial}>
           <View style={estilos.iconeEssencial}><Ionicons name="star" size={16} color="#A85B11" /></View>

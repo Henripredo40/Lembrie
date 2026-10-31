@@ -13,7 +13,6 @@ const estilos = StyleSheet.create({
   tituloFormulario: { color: cores.texto, fontSize: 15, fontWeight: '900' },
   legendaFormulario: { color: cores.textoSuave, fontSize: 13, marginTop: 3 },
   rotuloCategoria: { color: cores.texto, fontSize: 13, fontWeight: '700', marginBottom: 8 },
-  listaCategorias: { gap: 7, paddingBottom: 4, paddingRight: 3 },
   opcaoCategoria: { minHeight: 44, borderWidth: 1, borderColor: cores.linha, borderRadius: 12, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: cores.branco },
   opcaoCategoriaAtiva: { borderColor: '#B9DCD4', backgroundColor: cores.primarioClaro },
   textoCategoria: { color: cores.textoSuave, fontSize: 13, fontWeight: '700' },
@@ -38,7 +37,7 @@ const estilos = StyleSheet.create({
   conteudoModal: { padding: 18, paddingBottom: 40, maxWidth: 720, width: '100%', alignSelf: 'center' },
   previaModal: { minHeight: 130, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: cores.branco, borderWidth: 1, borderColor: cores.linha, marginBottom: 18 },
   textoPrevia: { color: cores.textoSuave, fontSize: 13, marginTop: 8 },
-  gradeCategorias: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  gradeCategorias: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingBottom: 4 },
 });
 
 export default estilos;
