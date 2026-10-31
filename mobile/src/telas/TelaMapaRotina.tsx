@@ -309,7 +309,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
       <Text style={estilos.sobretitulo}>PLANEJAMENTO</Text>
       <Text style={estilos.titulo}>Mapa e rotina</Text>
-      <Text style={estilos.subtitulo}>Pesquise pelo endereço completo com número ou use o CEP como referência. Arraste o mapa para ajustar o pino ao local exato.</Text>
+      <Text style={estilos.subtitulo}>Pesquise pelo endereço completo com número ou use o CEP como referência. Role a tela na vertical; deslize o mapa para os lados ou toque nele para ajustar o pino.</Text>
       <View style={estilos.modosBusca}>
         <Pressable accessibilityRole="button" accessibilityState={{ selected: modoBusca === 'endereco' }} onPress={() => { definirModoBusca('endereco'); definirLocais([]); definirErro(''); }} style={[estilos.modoBusca, modoBusca === 'endereco' && estilos.modoBuscaAtivo]}><Text style={[estilos.textoModoBusca, modoBusca === 'endereco' && estilos.textoModoBuscaAtivo]}>Endereço ou lugar</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityState={{ selected: modoBusca === 'cep' }} onPress={() => { definirModoBusca('cep'); definirLocais([]); definirErro(''); }} style={[estilos.modoBusca, modoBusca === 'cep' && estilos.modoBuscaAtivo]}><Text style={[estilos.textoModoBusca, modoBusca === 'cep' && estilos.textoModoBuscaAtivo]}>Buscar por CEP</Text></Pressable>

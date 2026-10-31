@@ -45,7 +45,8 @@ export default function MapaOSMBase({ latitude, longitude, onChoose }: Props) {
   centroAtual.current = { x: centroX, y: centroY };
   escolherAtual.current = onChoose;
   const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_event, gesto) => Math.abs(gesto.dx) + Math.abs(gesto.dy) > 7,
+    onMoveShouldSetPanResponder: (_event, gesto) => Math.abs(gesto.dx) > 10 && Math.abs(gesto.dx) > Math.abs(gesto.dy) * 1.2,
+    onPanResponderTerminationRequest: () => true,
     onPanResponderMove: Animated.event([null, { dx: deslocamento.x, dy: deslocamento.y }], { useNativeDriver: false }),
     onPanResponderRelease: (_event, gesto) => {
       const ponto = coordenadas(centroAtual.current.x - gesto.dx, centroAtual.current.y - gesto.dy);
@@ -113,7 +114,7 @@ export default function MapaOSMBase({ latitude, longitude, onChoose }: Props) {
       <View pointerEvents="none" style={estilos.marcadorMapa}>
         <Ionicons name="location" size={34} color="#D92D20" />
       </View>
-      <View pointerEvents="none" style={estilos.dicaMapa}><Text style={estilos.textoDicaMapa}>Arraste para mover o mapa ou toque no endereço</Text></View>
+      <View pointerEvents="none" style={estilos.dicaMapa}><Text style={estilos.textoDicaMapa}>Deslize para os lados ou toque para ajustar o ponto</Text></View>
     </View>
   );
 }
