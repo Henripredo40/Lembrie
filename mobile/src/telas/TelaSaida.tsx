@@ -1,6 +1,6 @@
 import estilos from '../estilos/TelaSaida.estilos';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView,  Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView,  Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, Botao, CampoTexto, EstadoVazio, TituloSecao } from '../componentes/Elementos';
@@ -88,7 +88,22 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
     definirResultadoSaida(null);
   }
 
+  function confirmarItensPendentes(quantidade) {
+    const texto = `${quantidade} ${quantidade === 1 ? 'item ainda não está marcado' : 'itens ainda não estão marcados'}. Quer revisar a lista antes de registrar a saída?`;
+    if (Platform.OS === 'web') {
+      return Promise.resolve(window.confirm(texto));
+    }
+    return new Promise((resolver) => {
+      Alert.alert('Ainda há itens pendentes', texto, [
+        { text: 'Revisar lista', style: 'cancel', onPress: () => resolver(false) },
+        { text: 'Registrar mesmo assim', onPress: () => resolver(true) },
+      ], { cancelable: true, onDismiss: () => resolver(false) });
+    });
+  }
+
   async function conferirSaida() {
+    const pendentes = lista.filter((item) => !item.conferido).length;
+    if (pendentes && !(await confirmarItensPendentes(pendentes))) return;
     definirErro('');
     definirResultadoSaida(null);
     definirConferindoSaida(true);
