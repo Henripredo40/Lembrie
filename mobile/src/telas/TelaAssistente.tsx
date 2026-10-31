@@ -4,10 +4,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { cores } from '../tema';
 import estilos from '../estilos/TelaAssistente.estilos';
 
-const perguntasRápidas = ['O que levar para o trabalho?', 'Quais lugares eu costumo visitar?', 'Quais são meus itens essenciais?'];
+const perguntasRápidas = [
+  'Como cadastro um objeto e marco como essencial?',
+  'Como planejo uma saída pelo mapa?',
+  'Como pesquiso um endereço ou CEP?',
+  'Como conecto meu chaveiro Bluetooth?',
+  'Como funcionam a localização e a privacidade?',
+  'O que levar para o trabalho?',
+];
 
 export default function TelaAssistente({ api }) {
-  const [mensagens, definirMensagens] = useState([{ id: 'inicio', papel: 'assistente', texto: 'Olá! Posso sugerir o que levar para um local, consultar seus objetos e ajudar com sua rotina. O que você quer saber?' }]);
+  const [mensagens, definirMensagens] = useState([{ id: 'inicio', papel: 'assistente', texto: 'Olá! Posso ajudar você a usar o Lembriê, explicar objetos, mapa, localização, chaveiro e segurança, além de sugerir o que levar. Escolha uma pergunta ou escreva sua dúvida.' }]);
   const [texto, definirTexto] = useState('');
   const [enviando, definirEnviando] = useState(false);
   const [iaAtiva, definirIaAtiva] = useState(null);
@@ -43,7 +50,7 @@ export default function TelaAssistente({ api }) {
       <ScrollView ref={rolagem} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled" onContentSizeChange={() => rolagem.current?.scrollToEnd({ animated: true })}>
         <Text style={estilos.sobretitulo}>AJUDA PERSONALIZADA</Text>
         <Text style={estilos.titulo}>Converse com Lembriê</Text>
-        <Text style={estilos.subtitulo}>{iaAtiva === true ? 'IA Gemini ativa: posso considerar seus objetos e destinos salvos. Suas perguntas e esse contexto são enviados ao Google para gerar a resposta; o histórico não é guardado pela API do Gemini.' : iaAtiva === false ? 'Assistente especialista em objetos e destinos. A IA Gemini ainda não foi ativada no servidor; por enquanto, uso as respostas locais do Lembriê.' : 'Conferindo se a IA está disponível…'}</Text>
+        <Text style={estilos.subtitulo}>{iaAtiva === true ? 'Tire dúvidas sobre como usar o site e o app, peça ajuda com mapa, rotina, objetos e Bluetooth, ou receba sugestões. Quando a Gemini responde, sua pergunta e o contexto necessário são enviados ao Google.' : iaAtiva === false ? 'Tire dúvidas sobre como usar o site e o app, mapa, rotina, objetos, Bluetooth e segurança. A IA Gemini não está ativa no servidor; as respostas e sugestões básicas do Lembriê continuam disponíveis.' : 'Conferindo se a IA está disponível…'}</Text>
         <View style={estilos.perguntas}>
           {perguntasRápidas.map(pergunta => <Pressable key={pergunta} accessibilityRole="button" onPress={() => enviar(pergunta)} style={estilos.pergunta}><Text style={estilos.textoPergunta}>{pergunta}</Text><Ionicons name="arrow-forward" size={16} color={cores.primario} /></Pressable>)}
         </View>
@@ -53,7 +60,7 @@ export default function TelaAssistente({ api }) {
         </View>
       </ScrollView>
       <View style={estilos.compositor}>
-        <TextInput accessibilityLabel="Escreva sua pergunta" value={texto} onChangeText={definirTexto} placeholder="Pergunte sobre seus objetos..." placeholderTextColor={cores.textoSuave} multiline maxLength={500} onSubmitEditing={() => enviar()} style={estilos.campo} />
+        <TextInput accessibilityLabel="Escreva sua pergunta" value={texto} onChangeText={definirTexto} placeholder="Pergunte como usar ou o que levar..." placeholderTextColor={cores.textoSuave} multiline maxLength={500} onSubmitEditing={() => enviar()} style={estilos.campo} />
         <Pressable accessibilityRole="button" accessibilityLabel="Enviar pergunta" disabled={enviando || !texto.trim()} onPress={() => enviar()} style={[estilos.enviar, (!texto.trim() || enviando) && estilos.enviarDesativado]}><Ionicons name="send" size={18} color={cores.branco} /></Pressable>
       </View>
     </KeyboardAvoidingView>

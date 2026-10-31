@@ -3,7 +3,7 @@ import { cores, raios } from '../tema';
 
 const estilos = StyleSheet.create({
   tela: { flex: 1, backgroundColor: cores.fundo },
-  conteudo: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 26, maxWidth: 720, width: '100%', alignSelf: 'center' },
+  conteudo: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 92, maxWidth: 720, width: '100%', alignSelf: 'center' },
   cabecalhoBoasVindas: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12 },
   blocoTexto: { flex: 1 },
   saudacao: { color: cores.primario, fontSize: 13, fontWeight: '900', letterSpacing: 1.1 },
@@ -54,6 +54,8 @@ const estilos = StyleSheet.create({
   mensagemAtividade: { color: cores.texto, fontSize: 13, fontWeight: '700' },
   dataAtividade: { color: cores.textoSuave, fontSize: 13, marginTop: 3 },
   semAtividade: { color: cores.textoSuave, fontSize: 13, backgroundColor: cores.branco, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: cores.linha },
+  ajudaFlutuante: { position: 'absolute', right: 16, bottom: 16, minHeight: 50, paddingHorizontal: 18, borderRadius: 25, backgroundColor: cores.primario, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, elevation: 7, shadowColor: '#0B3F39', shadowOpacity: 0.24, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, zIndex: 20 },
+  textoAjudaFlutuante: { color: cores.branco, fontSize: 14, fontWeight: '900' },
 });
 
 export default estilos;

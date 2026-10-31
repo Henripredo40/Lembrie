@@ -68,8 +68,8 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
   }, [objetos, categoriasDaRotina]);
 
   return (
+    <View style={estilos.tela}>
     <ScrollView
-      style={estilos.tela}
       contentContainerStyle={estilos.conteudo}
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={atualizando} onRefresh={atualizar} tintColor={cores.primario} colors={[cores.primario]} />}
@@ -198,6 +198,11 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
         </>
       )}
     </ScrollView>
+    <Pressable accessibilityRole="button" accessibilityLabel="Abrir ajuda com IA" onPress={() => abrirTela('assistente')} style={({ pressed }) => [estilos.ajudaFlutuante, pressed && { opacity: 0.86, transform: [{ scale: 0.97 }] }]}>
+      <Ionicons name="sparkles" size={18} color={cores.branco} />
+      <Text style={estilos.textoAjudaFlutuante}>Ajuda</Text>
+    </Pressable>
+    </View>
   );
 }
 
