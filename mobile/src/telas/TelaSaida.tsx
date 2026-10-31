@@ -179,14 +179,6 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
       <Text style={estilos.titulo}>Antes de sair</Text>
       <Text style={estilos.subtitulo}>Monte sua lista e marque os itens conferidos. A detecção por proximidade e os alertas dependem de um chaveiro Bluetooth compatível associado.</Text>
 
-      <View style={estilos.cartaoDestino}>
-        <View style={estilos.iconeDestino}><Ionicons name="navigate-outline" size={20} color={cores.primario} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={estilos.rotuloDestino}>PARA ONDE VOCÊ VAI?</Text>
-          <CampoTexto value={destino} onChangeText={definirDestino} placeholder="Ex.: trabalho, academia ou viagem" returnKeyType="done" estilo={estilos.campoDestino} />
-        </View>
-      </View>
-
       <Botao título={carregando ? 'Preparando sua lista...' : 'Montar lista de saída'} ícone="checkbox-outline" aoPressionar={montarLista} carregando={carregando} />
 
       {perfis.length ? (
