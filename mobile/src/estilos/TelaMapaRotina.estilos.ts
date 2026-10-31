@@ -35,6 +35,7 @@ const estilos = StyleSheet.create({
   atribuição: { color: cores.textoSuave, fontSize: 12, textAlign: 'right', marginTop: -7 },
   cartaoSugestões: { padding: 14, borderRadius: 17, backgroundColor: cores.branco, borderWidth: 1, borderColor: cores.linha, gap: 8 },
   listaSugestões: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  resultadoRecomendacao: { width: '100%', gap: 6 },
   listaObjetos: { gap: 8 },
   cabecalhoObjetos: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   acaoSelecao: { color: cores.primario, fontSize: 13, fontWeight: '800' },
