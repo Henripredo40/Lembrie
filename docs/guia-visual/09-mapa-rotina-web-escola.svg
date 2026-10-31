@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1200" viewBox="0 0 1920 1200">
+<defs>
+ <linearGradient id="fundo" x2="0" y2="1"><stop stop-color="#f7faf9"/><stop offset="1" stop-color="#edf4f1"/></linearGradient>
+ <linearGradient id="verde" x2="1" y2="1"><stop stop-color="#178274"/><stop offset="1" stop-color="#11685e"/></linearGradient>
+ <filter id="sombra" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#193c36" flood-opacity=".10"/></filter>
+ <style>.txt{font-family:Arial,'Helvetica Neue',sans-serif;fill:#203733}.muted{fill:#6b7d79}.teal{fill:#147b70}.white{fill:#fff}.tiny{font-size:14px}.small{font-size:17px}.medium{font-size:20px}.h2{font-size:27px;font-weight:700}.bold{font-weight:700}.caps{font-size:13px;font-weight:700;letter-spacing:1.8px}</style>
+</defs>
+<rect width="1920" height="1200" fill="url(#fundo)"/>
+<!-- Browser frame -->
+<rect x="24" y="20" width="1872" height="1160" rx="22" fill="#fff" stroke="#dce8e4" stroke-width="2"/>
+<path d="M24 76h1872" stroke="#e3ece9" stroke-width="2"/>
+<circle cx="56" cy="48" r="7" fill="#f1867c"/><circle cx="80" cy="48" r="7" fill="#e5c467"/><circle cx="104" cy="48" r="7" fill="#70b990"/>
+<rect x="690" y="33" width="540" height="30" rx="15" fill="#f2f6f4"/><text x="855" y="54" class="txt tiny muted">🔒  lembre-web.onrender.com / mapa-e-rotina</text>
+<!-- Site header -->
+<rect x="25" y="77" width="1870" height="92" fill="#fff"/>
+<rect x="62" y="98" width="52" height="52" rx="17" fill="url(#verde)"/><path d="M88 108c-9 0-16 7-16 16 0 12 16 23 16 23s16-11 16-23c0-9-7-16-16-16z" fill="#fff"/><path d="m81 125 5 5 10-12" fill="none" stroke="#168071" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="130" y="118" class="txt teal bold" style="font-size:15px;letter-spacing:3px">LEMBRIÊ</text><text x="130" y="143" class="txt bold" style="font-size:21px">Mapa e rotina</text>
+<rect x="1494" y="99" width="226" height="48" rx="15" fill="#edf7f4"/><circle cx="1521" cy="123" r="13" fill="#d9eee8"/><path d="m1515 123 4 4 8-9" fill="none" stroke="#147b70" stroke-width="2.4"/><text x="1542" y="119" class="txt caps teal" style="letter-spacing:1px">ÚLTIMO LOGIN</text><text x="1542" y="137" class="txt tiny bold">31 de out., 03:50</text>
+<rect x="1740" y="98" width="54" height="50" rx="16" fill="#e9f5f1"/><path d="M1767 111v12m0 0 7-7m-7 7-7-7m14 10a11 11 0 1 1-17-9" fill="none" stroke="#147b70" stroke-width="2.4" stroke-linecap="round"/>
+<path d="M25 169h1870" stroke="#e2ece8" stroke-width="2"/>
+<!-- Page intro -->
+<text x="105" y="221" class="txt caps teal">PLANEJAMENTO DE SAÍDA</text><text x="105" y="263" class="txt" style="font-size:37px;font-weight:700">O que levar para este lugar?</text><text x="105" y="292" class="txt small muted">Encontre o destino no mapa e receba sugestões úteis para a ocasião.</text>
+<!-- Search and selected destination -->
+<rect x="105" y="319" width="1710" height="72" rx="18" fill="#fff" stroke="#dce8e4" stroke-width="2"/>
+<circle cx="140" cy="354" r="11" fill="none" stroke="#6d8580" stroke-width="2.5"/><path d="m148 362 8 8" stroke="#6d8580" stroke-width="2.5" stroke-linecap="round"/><text x="176" y="361" class="txt medium">Escola Classe 108 de Samambaia</text><rect x="1592" y="332" width="199" height="46" rx="13" fill="url(#verde)"/><text x="1640" y="361" class="white small bold">Buscar destino</text>
+<!-- map card -->
+<rect x="105" y="419" width="770" height="585" rx="24" fill="#fff" stroke="#dce8e4" stroke-width="2" filter="url(#sombra)"/>
+<text x="137" y="461" class="txt h2">Destino no mapa</text><text x="137" y="488" class="txt tiny muted">Confira o local selecionado antes de montar sua lista.</text>
+<rect x="132" y="508" width="716" height="361" rx="17" fill="#e9f0e9"/>
+<!-- map parks and blocks -->
+<path d="M132 602 300 508h180l-58 97-195 54zM611 508h237v152l-130-22-73-65zM132 741l179-48 153 52-43 124H132zM608 746l124-83 116 47v159H600z" fill="#d5e7d6"/>
+<path d="M132 658 848 581M250 508l191 361M540 508l-53 361M724 508 577 869M132 713l716-69M132 798l716-39" fill="none" stroke="#fff" stroke-width="19" stroke-linecap="round"/>
+<path d="M132 658 848 581M250 508l191 361M540 508l-53 361M724 508 577 869M132 713l716-69M132 798l716-39" fill="none" stroke="#d1d9d1" stroke-width="2" stroke-linecap="round"/>
+<path d="M267 532h113m241 18h126M159 830h135m316-25h110M334 721h94m178-144h95" stroke="#bdcfbd" stroke-width="6" stroke-linecap="round"/>
+<!-- map labels -->
+<text x="168" y="578" class="txt tiny muted">SAMAMBAIA SUL</text><text x="655" y="550" class="txt tiny muted">ÁREA RESIDENCIAL</text><text x="176" y="778" class="txt tiny muted">PRAÇA DA REGIÃO</text><text x="638" y="829" class="txt tiny muted">ESCOLA</text>
+<rect x="385" y="633" width="222" height="48" rx="15" fill="#fff" filter="url(#sombra)"/><circle cx="410" cy="657" r="10" fill="#147b70"/><path d="m405 657 4 4 7-9" fill="none" stroke="#fff" stroke-width="2"/><text x="430" y="663" class="txt tiny bold">Escola Classe 108</text>
+<path d="M496 685v17" stroke="#147b70" stroke-width="3" stroke-dasharray="4 4"/><circle cx="496" cy="706" r="7" fill="#147b70" stroke="#fff" stroke-width="3"/>
+<rect x="137" y="889" width="716" height="86" rx="16" fill="#f4f8f6"/><circle cx="168" cy="921" r="14" fill="#e2f2ed"/><path d="M168 911c-6 0-10 5-10 10 0 8 10 16 10 16s10-8 10-16c0-5-4-10-10-10z" fill="#147b70"/><text x="196" y="920" class="txt small bold">Escola Classe 108 de Samambaia</text><text x="196" y="946" class="txt tiny muted">Centro-Oeste, Samambaia Sul · Brasília, DF</text><text x="196" y="964" class="txt tiny teal bold">Local encontrado no mapa</text>
+<!-- recommendation panel -->
+<rect x="901" y="419" width="914" height="585" rx="24" fill="#fff" stroke="#dce8e4" stroke-width="2" filter="url(#sombra)"/>
+<rect x="932" y="448" width="54" height="54" rx="17" fill="#e4f4ef"/><path d="m959 459 3 9 9 3-9 3-3 9-3-9-9-3 9-3z" fill="#147b70"/><text x="1003" y="468" class="txt caps teal">RECOMENDAÇÃO PARA ESTE DESTINO</text><text x="1003" y="494" class="txt tiny muted">Uma sugestão geral para o seu dia na escola</text>
+<text x="932" y="548" class="txt h2">Eu levaria:</text>
+<!-- recommended items two columns -->
+<g class="txt">
+ <rect x="932" y="570" width="414" height="65" rx="15" fill="#f2f8f6" stroke="#dcece6"/><circle cx="962" cy="602" r="17" fill="#dcefe9"/><path d="M955 594h14v17h-14zM958 591h8" fill="none" stroke="#147b70" stroke-width="2"/><text x="992" y="598" class="txt small bold">Mochila</text><text x="992" y="619" class="txt tiny muted">Para carregar o material</text>
+ <rect x="1360" y="570" width="423" height="65" rx="15" fill="#f2f8f6" stroke="#dcece6"/><circle cx="1390" cy="602" r="17" fill="#dcefe9"/><path d="M1382 592h16v20h-16zM1386 598h8m-8 5h8" fill="none" stroke="#147b70" stroke-width="2"/><text x="1420" y="598" class="txt small bold">Caderno ou material da aula</text><text x="1420" y="619" class="txt tiny muted">Confira o horário das aulas</text>
+ <rect x="932" y="648" width="414" height="65" rx="15" fill="#f2f8f6" stroke="#dcece6"/><circle cx="962" cy="680" r="17" fill="#dcefe9"/><path d="M955 672h14v17h-14zM958 676h8m-8 4h6" fill="none" stroke="#147b70" stroke-width="2"/><text x="992" y="676" class="txt small bold">Estojo com lápis e canetas</text><text x="992" y="697" class="txt tiny muted">Para acompanhar as atividades</text>
+ <rect x="1360" y="648" width="423" height="65" rx="15" fill="#f2f8f6" stroke="#dcece6"/><circle cx="1390" cy="680" r="17" fill="#dcefe9"/><path d="M1382 671h16v18h-16zM1385 676h10m-10 4h10" fill="none" stroke="#147b70" stroke-width="2"/><text x="1420" y="676" class="txt small bold">Livros ou apostilas do dia</text><text x="1420" y="697" class="txt tiny muted">Leve os materiais da aula</text>
+ <rect x="932" y="726" width="414" height="65" rx="15" fill="#f2f8f6" stroke="#dcece6"/><circle cx="962" cy="758" r="17" fill="#dcefe9"/><path d="M957 747h10v21h-10zM960 752h4m-4 4h4" fill="none" stroke="#147b70" stroke-width="2"/><text x="992" y="754" class="txt small bold">Agenda ou planner</text><text x="992" y="775" class="txt tiny muted">Anote tarefas e compromissos</text>
+ <rect x="1360" y="726" width="423" height="65" rx="15" fill="#f2f8f6" stroke="#dcece6"/><circle cx="1390" cy="758" r="17" fill="#dcefe9"/><path d="M1386 746h8v5l3 4v13h-14v-13l3-4zM1387 761h6" fill="none" stroke="#147b70" stroke-width="2"/><text x="1420" y="754" class="txt small bold">Garrafa de água</text><text x="1420" y="775" class="txt tiny muted">Para se manter hidratado</text>
+ <rect x="932" y="804" width="414" height="65" rx="15" fill="#f2f8f6" stroke="#dcece6"/><circle cx="962" cy="836" r="17" fill="#dcefe9"/><path d="M954 830h16l-2 13h-12zM956 827h12" fill="none" stroke="#147b70" stroke-width="2"/><text x="992" y="832" class="txt small bold">Lanche</text><text x="992" y="853" class="txt tiny muted">Se for passar o dia por lá</text>
+</g>
+<rect x="932" y="894" width="851" height="75" rx="16" fill="#fff8e9" stroke="#f1dfb7"/><circle cx="963" cy="931" r="14" fill="#fff0cf"/><text x="958" y="937" class="txt bold" style="font-size:18px;fill:#9a6a10">i</text><text x="991" y="924" class="txt tiny bold" style="fill:#7a601f">Sugestões gerais</text><text x="991" y="947" class="txt tiny muted">A lista pode incluir itens que você ainda não cadastrou. Confira o que faz sentido para sua aula.</text>
+<!-- Saved items distinct -->
+<rect x="105" y="1027" width="1710" height="90" rx="20" fill="#fff" stroke="#dce8e4" stroke-width="2"/>
+<circle cx="148" cy="1072" r="20" fill="#e4f4ef"/><path d="M141 1065v14m14-14v14m-14-14q0-5 4-5t4 5m-4 0q0-5 4-5t4 5" fill="none" stroke="#147b70" stroke-width="2" stroke-linecap="round"/><text x="185" y="1065" class="txt caps teal">DA SUA LISTA DE OBJETOS</text><text x="185" y="1090" class="txt tiny muted">Cadastrados na sua conta</text>
+<rect x="520" y="1045" width="270" height="54" rx="15" fill="#f1f8f5" stroke="#a6d6c8" stroke-width="2"/><rect x="537" y="1061" width="22" height="22" rx="6" fill="#147b70"/><path d="m542 1072 5 5 9-11" fill="none" stroke="#fff" stroke-width="2.5"/><text x="572" y="1069" class="txt small bold">Chave de casa</text><text x="572" y="1088" class="txt tiny muted">Objeto cadastrado</text><text x="826" y="1078" class="txt small muted">Este item aparece separado da recomendação escolar.</text>
+<!-- Bottom nav -->
+<rect x="615" y="1134" width="690" height="38" rx="18" fill="#fff"/>
+<text x="672" y="1158" class="txt tiny muted">⌂  Início</text><text x="793" y="1158" class="txt tiny muted">◇  Objetos</text><text x="917" y="1158" class="txt tiny muted">ᛒ  Bluetooth</text><rect x="1046" y="1138" width="109" height="31" rx="12" fill="#e6f4ef"/><text x="1064" y="1158" class="txt tiny teal bold">▦  Mapa e rotina</text><text x="1190" y="1158" class="txt tiny muted">☰  Mais</text>
+</svg>
