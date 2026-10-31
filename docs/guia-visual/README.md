@@ -14,16 +14,14 @@ Referências visuais das principais telas e funções do site e do aplicativo. O
 - [07 · Perfil e segurança](./07-perfil-seguranca.svg) — Atualize suas informações e confira os acessos registrados.
 - [08 · Histórico](./08-historico.svg) — Consulte registros de uso e mantenha suas preferências organizadas.
 
-## Pranchas simuladas do site e do app
+## Pranchas simuladas
 
 Estas pranchas são exemplos visuais em português do Brasil. A recomendação escolar é ilustrativa e aparece separada dos objetos cadastrados.
 
-- [Todas as telas do site](./11-pranchas-todas-as-telas-web.svg) — Visão geral da versão web.
-- [Mapa e rotina no site](./12-mapa-e-rotina-web.svg) — Tela web de mapa e planejamento.
-- [Site: recomendação para escola](./09-mapa-rotina-web-escola.svg) — Exemplo de sugestões gerais para uma escola, separado dos objetos da conta.
-- [Todas as telas do app](./13-pranchas-todas-as-telas-app.svg) — Visão geral da versão para celular.
-- [Mapa e rotina no app](./14-mapa-e-rotina-app.svg) — Tela mobile de mapa e planejamento.
-- [App: recomendação para escola](./10-mapa-rotina-app-escola.svg) — Exemplo de sugestões gerais para uma escola, separado dos objetos da conta.
+As imagens estão separadas por plataforma:
+
+- [Pranchas do site (web)](./web/) — Todas as telas, mapa e rotina, e recomendação para escola.
+- [Pranchas do aplicativo (app)](./app/) — Todas as telas, mapa e rotina, e recomendação para escola.
 
 ## Atualização
 
