@@ -38,6 +38,17 @@ const estilos = StyleSheet.create({
   previaModal: { minHeight: 130, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: cores.branco, borderWidth: 1, borderColor: cores.linha, marginBottom: 18 },
   textoPrevia: { color: cores.textoSuave, fontSize: 13, marginTop: 8 },
   gradeCategorias: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, paddingBottom: 4 },
+  fundoConfirmacao: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 22, backgroundColor: 'rgba(16,24,40,0.52)' },
+  fundoConfirmacaoBotao: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
+  painelConfirmacao: { width: '100%', maxWidth: 420, padding: 20, borderRadius: 21, backgroundColor: cores.branco, borderWidth: 1, borderColor: cores.linha },
+  iconeConfirmacao: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: cores.vermelhoClaro, marginBottom: 12 },
+  tituloConfirmacao: { color: cores.texto, fontSize: 18, fontWeight: '900' },
+  textoConfirmacao: { color: cores.textoSuave, fontSize: 14, lineHeight: 21, marginTop: 7 },
+  acoesConfirmacao: { flexDirection: 'row', justifyContent: 'flex-end', gap: 9, marginTop: 19 },
+  botaoCancelarConfirmacao: { minHeight: 44, paddingHorizontal: 15, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: cores.fundo },
+  textoCancelarConfirmacao: { color: cores.texto, fontSize: 13, fontWeight: '800' },
+  botaoRemoverConfirmacao: { minHeight: 44, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: cores.vermelho },
+  textoRemoverConfirmacao: { color: cores.branco, fontSize: 13, fontWeight: '800' },
 });
 
 export default estilos;

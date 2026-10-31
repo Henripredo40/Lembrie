@@ -1,6 +1,6 @@
 import estilos from '../estilos/TelaObjetos.estilos';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,  Switch, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,  Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import ImagemObjeto from '../componentes/ImagemObjeto';
@@ -27,6 +27,8 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
   const [categoriaEdicaoPersonalizada, setCategoriaEdicaoPersonalizada] = useState('');
   const [essencialEdicao, setEssencialEdicao] = useState(false);
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  const [objetoRemocao, setObjetoRemocao] = useState(null);
+  const [removendo, setRemovendo] = useState(false);
 
   const categoriasDisponiveis = useMemo<CategoriaComRepresentante[]>(() => {
     const predefinidas = new Set(categoriasDeObjeto.map((opção) => normalizarTexto(opção.nome)));
@@ -124,23 +126,23 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
   }
 
   function confirmarRemocao(objeto) {
-    const remover = async () => {
-      try {
-        await api('/objects/' + objeto.id, { method: 'DELETE' });
-        definirObjetos((atuais) => atuais.filter((item) => String(item.id) !== String(objeto.id)));
-        notificar('“' + objeto.name + '” foi removido da sua lista.');
-      } catch (erro) {
-        notificar(erro.message || 'Não foi possível remover o objeto.');
-      }
-    };
-    if (Platform.OS === 'web') {
-      if (window.confirm('Remover “' + objeto.name + '” da sua lista?')) remover();
-      return;
+    setObjetoRemocao(objeto);
+  }
+
+  async function removerObjeto() {
+    if (!objetoRemocao || removendo) return;
+    setRemovendo(true);
+    try {
+      await api('/objects/' + objetoRemocao.id, { method: 'DELETE' });
+      definirObjetos((atuais) => atuais.filter((item) => String(item.id) !== String(objetoRemocao.id)));
+      setObjetoRemocao(null);
+      notificar('“' + objetoRemocao.name + '” foi removido da sua lista.');
+    } catch (erro) {
+      setObjetoRemocao(null);
+      notificar(erro.message || 'Não foi possível remover o objeto.');
+    } finally {
+      setRemovendo(false);
     }
-    Alert.alert('Remover objeto?', '“' + objeto.name + '” será removido da sua lista.', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Remover', style: 'destructive', onPress: remover },
-    ]);
   }
 
   return (
@@ -235,6 +237,21 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
             <Botao título="Salvar alterações" aoPressionar={salvarEdicao} carregando={salvandoEdicao} estilo={{ marginTop: 8 }} />
           </ScrollView>
         </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={Boolean(objetoRemocao)} transparent animationType="fade" onRequestClose={() => { if (!removendo) setObjetoRemocao(null); }}>
+        <View style={estilos.fundoConfirmacao}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Cancelar remoção" disabled={removendo} onPress={() => setObjetoRemocao(null)} style={estilos.fundoConfirmacaoBotao} />
+          <View style={estilos.painelConfirmacao}>
+            <View style={estilos.iconeConfirmacao}><Ionicons name="trash-outline" size={21} color={cores.vermelho} /></View>
+            <Text style={estilos.tituloConfirmacao}>Remover objeto?</Text>
+            <Text style={estilos.textoConfirmacao}>Remover “{objetoRemocao?.name}” da sua lista? Esta ação não pode ser desfeita.</Text>
+            <View style={estilos.acoesConfirmacao}>
+              <Pressable accessibilityRole="button" disabled={removendo} onPress={() => setObjetoRemocao(null)} style={estilos.botaoCancelarConfirmacao}><Text style={estilos.textoCancelarConfirmacao}>Cancelar</Text></Pressable>
+              <Pressable accessibilityRole="button" disabled={removendo} onPress={removerObjeto} style={[estilos.botaoRemoverConfirmacao, removendo && { opacity: 0.65 }]}><Text style={estilos.textoRemoverConfirmacao}>{removendo ? 'Removendo…' : 'Remover'}</Text></Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </ScrollView>
   );
