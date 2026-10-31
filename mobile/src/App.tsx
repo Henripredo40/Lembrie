@@ -41,6 +41,7 @@ export default function App() {
   const [objetos, definirObjetos] = useState([]);
   const [eventos, definirEventos] = useState([]);
   const [perfil, definirPerfil] = useState(null);
+  const [seguranca, definirSeguranca] = useState(null);
   const [preferências, definirPreferências] = useState(preferênciasIniciais);
   const [categoriaInicial, definirCategoriaInicial] = useState('');
   const [destinoInicial, definirDestinoInicial] = useState('');
@@ -183,16 +184,18 @@ export default function App() {
     if (!token) return;
     if (!silencioso) definirAtualizando(true);
     try {
-      const [objetosNovos, eventosNovos, perfilNovo, preferênciasNovas] = await Promise.all([
+      const [objetosNovos, eventosNovos, perfilNovo, preferênciasNovas, segurancaNova] = await Promise.all([
         chamarApi('/objects'),
         chamarApi('/events'),
         chamarApi('/me'),
         chamarApi('/settings'),
+        chamarApi('/me/security').catch(() => null),
       ]);
       definirObjetos(Array.isArray(objetosNovos) ? objetosNovos : []);
       definirEventos(Array.isArray(eventosNovos) ? eventosNovos : []);
       definirPerfil(perfilNovo || null);
       definirPreferências({ ...preferênciasIniciais, ...(preferênciasNovas || {}) });
+      definirSeguranca(segurancaNova || null);
       definirErroConexão('');
     } catch (falha) {
       definirErroConexão(falha.message || 'Não foi possível atualizar seus dados.');
@@ -200,6 +203,7 @@ export default function App() {
         await AsyncStorage.removeItem('token').catch(() => {});
         definirToken(null);
         definirPerfil(null);
+        definirSeguranca(null);
         definirObjetos([]);
         definirEventos([]);
         definirErroConexão('Sua sessão terminou. Entre novamente para continuar.');
@@ -229,6 +233,7 @@ export default function App() {
     definirIdSessãoConta(dados.session_id ? String(dados.session_id) : null);
     definirToken(dados.token);
     definirPerfil(dados.user || null);
+    definirSeguranca(null);
     definirTela('inicio');
     definirBusca('');
     definirErroConexão('');
@@ -363,6 +368,7 @@ export default function App() {
       await AsyncStorage.removeItem('token').catch(() => {});
       definirToken(null);
       definirPerfil(null);
+      definirSeguranca(null);
       definirObjetos([]);
       definirEventos([]);
       definirPreferências(preferênciasIniciais);
@@ -474,7 +480,7 @@ export default function App() {
     return <SafeAreaProvider><SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={estilos.raiz}><StatusBar style="dark" /><View style={{ flex: 1, justifyContent: 'center', padding: 24, maxWidth: 520, width: '100%', alignSelf: 'center', gap: 14 }}>
       <View style={{ width: 58, height: 58, borderRadius: 20, backgroundColor: cores.primarioClaro, alignItems: 'center', justifyContent: 'center' }}><Ionicons name="location" size={29} color={cores.primario} /></View>
       <Text style={{ color: cores.texto, fontSize: 24, fontWeight: '900' }}>Localização necessária</Text>
-      <Text style={{ color: cores.textoSuave, fontSize: 15, lineHeight: 23 }}>O Lembriê usa o GPS enquanto o app ou site estiver aberto para reconhecer lugares visitados e sugerir itens. As coordenadas não ficam salvas; nomes aproximados de lugares frequentes e a cidade/estado do último acesso podem ser guardados. A IA só recebe o local aproximado e seus objetos cadastrados quando estiver ativada.</Text>
+      <Text style={{ color: cores.textoSuave, fontSize: 15, lineHeight: 23 }}>A localização é necessária para usar o Lembriê. O GPS funciona enquanto o app ou site está aberto; não rastreamos em segundo plano. Para mostrar o último acesso, guardamos apenas cidade e estado quando conseguimos identificar o local, sem salvar as coordenadas GPS desse acesso. Para sugestões de rotina, nomes aproximados de lugares frequentes podem ser guardados por até 90 dias. Você pode rever as permissões nas configurações do aparelho ou do navegador.</Text>
       {permissaoLocalizacao === 'verificando' ? <ActivityIndicator size="small" color={cores.primario} /> : <Pressable accessibilityRole="button" onPress={solicitarPermissaoLocalizacao} style={{ minHeight: 50, paddingHorizontal: 16, borderRadius: 14, backgroundColor: cores.primario, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: cores.branco, fontWeight: '900' }}>Permitir localização e continuar</Text></Pressable>}
       {permissaoLocalizacao === 'negada' ? <Pressable accessibilityRole="button" onPress={() => { if (Platform.OS !== 'web') Linking.openSettings(); }}><Text style={{ color: cores.primario, fontSize: 13, fontWeight: '800' }}>{Platform.OS === 'web' ? 'Altere a permissão de localização nas configurações do site no navegador e tente novamente.' : 'Abrir configurações do aparelho'}</Text></Pressable> : null}
       <Pressable accessibilityRole="button" onPress={sairDaConta} style={{ paddingVertical: 12 }}><Text style={{ color: cores.textoSuave, textAlign: 'center' }}>Sair da conta</Text></Pressable>
@@ -483,7 +489,7 @@ export default function App() {
 
   let conteúdo;
   if (tela === 'inicio') {
-    conteúdo = <TelaInicio perfil={perfil} objetos={objetos} eventos={eventos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} sugestaoGPS={sugestaoGPS} />;
+    conteúdo = <TelaInicio perfil={perfil} seguranca={seguranca} objetos={objetos} eventos={eventos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} sugestaoGPS={sugestaoGPS} />;
   } else if (tela === 'objetos') {
     conteúdo = <TelaObjetos objetos={objetos} definirObjetos={definirObjetos} api={chamarApi} categoriaInicial={categoriaInicial} notificar={notificar} />;
   } else if (tela === 'bluetooth') {

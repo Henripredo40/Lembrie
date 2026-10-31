@@ -11,6 +11,7 @@ const perguntasRápidas = [
   'Como pesquiso um endereço ou CEP?',
   'Como conecto meu chaveiro Bluetooth?',
   'Como funcionam a localização e a privacidade?',
+  'Como vejo meu último login?',
   'Quais são meus itens essenciais?',
   'Quais objetos estão cadastrados?',
   'O que levar para o trabalho?',

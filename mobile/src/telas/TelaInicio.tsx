@@ -11,7 +11,7 @@ import { formatarData } from '../utils/date';
 
 type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string }; rotina?: boolean };
 
-export default function TelaInicio({ perfil, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
+export default function TelaInicio({ perfil, seguranca, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
   const [categoriasDaRotina, definirCategoriasDaRotina] = useState<string[]>([]);
 
   useEffect(() => {
@@ -53,6 +53,11 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
   const detectados = objetos.filter(chaveiroEstáConectado).length;
   const essenciais = objetos.filter(objetoÉEssencial).length;
   const nome = perfil?.name?.trim()?.split(/\s+/)[0] || 'Olá';
+  const sessaoRecente = seguranca?.sessions?.[0];
+  const ultimoAcesso = seguranca?.last_login ? new Date(String(seguranca.last_login).replace(' ', 'T')) : null;
+  const textoUltimoAcesso = ultimoAcesso && !Number.isNaN(ultimoAcesso.getTime())
+    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(ultimoAcesso)
+    : 'Ainda não há um acesso registrado';
   const categoriasVisiveis = useMemo(() => {
     const nomes = [...new Set<string>(objetos.map((objeto) => String(objeto.category || 'Outros').trim()).filter((categoria) => categoria.length > 0))];
     return nomes.map((nomeCategoria) => {
@@ -82,6 +87,16 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
         </View>
         <View style={estilos.avatar}><Text style={estilos.letraAvatar}>{nome.charAt(0).toLocaleUpperCase('pt-BR')}</Text></View>
       </View>
+
+      <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes do último login" onPress={() => abrirTela('perfil')} style={estilos.cartaoUltimoAcesso}>
+        <View style={estilos.iconeUltimoAcesso}><Ionicons name="shield-checkmark-outline" size={20} color={cores.primario} /></View>
+        <View style={estilos.detalheUltimoAcesso}>
+          <Text style={estilos.rotuloUltimoAcesso}>ÚLTIMO LOGIN</Text>
+          <Text style={estilos.dataUltimoAcesso}>{textoUltimoAcesso}</Text>
+          {sessaoRecente?.device_label ? <Text style={estilos.dispositivoUltimoAcesso}>{sessaoRecente.device_label}{sessaoRecente.location_label ? ' · ' + sessaoRecente.location_label : ''}</Text> : null}
+        </View>
+        <View style={estilos.atalhoUltimoAcesso}><Text style={estilos.textoAtalhoUltimoAcesso}>Detalhes</Text><Ionicons name="chevron-forward" size={16} color={cores.primario} /></View>
+      </Pressable>
 
       {erroConexao ? <Aviso ícone="cloud-offline-outline" tom="alerta" texto={erroConexao} /> : null}
 
