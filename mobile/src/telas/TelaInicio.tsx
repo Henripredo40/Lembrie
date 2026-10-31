@@ -3,10 +3,13 @@ import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView,  Text, TextInput, Pressable, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CartaoObjeto from '../componentes/CartaoObjeto';
+import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores, raios } from '../tema';
 import { categoriasDeObjeto, chaveiroEstáConectado, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
 import { formatarData } from '../utils/date';
+
+type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string } };
 
 export default function TelaInicio({ perfil, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas }) {
   const objetosEncontrados = useMemo(() => {
@@ -20,11 +23,15 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
   const essenciais = objetos.filter(objetoÉEssencial).length;
   const nome = perfil?.name?.trim()?.split(/\s+/)[0] || 'Olá';
   const categoriasVisiveis = useMemo(() => {
-    const predefinidas = categoriasDeObjeto.slice(0, 8);
+    const predefinidas: CategoriaComRepresentante[] = categoriasDeObjeto.slice(0, 8);
     const todasPredefinidas = new Set(categoriasDeObjeto.map((categoria) => normalizarTexto(categoria.nome)));
-    const personalizadas = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter((categoria) => categoria.length > 0))]
+    const personalizadas: CategoriaComRepresentante[] = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter((categoria) => categoria.length > 0))]
       .filter((categoria) => !todasPredefinidas.has(normalizarTexto(categoria)))
-      .map((categoria) => ({ nome: categoria, ícone: 'tag-outline' as const }));
+      .map((categoria) => ({
+        nome: categoria,
+        ícone: 'tag-outline' as const,
+        objetoRepresentativo: objetos.find((objeto) => normalizarTexto(String(objeto.category || '')) === normalizarTexto(categoria)),
+      }));
     return [...predefinidas, ...personalizadas];
   }, [objetos]);
 
@@ -92,7 +99,7 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
           const quantidade = objetos.filter((objeto) => normalizarTexto(objeto.category) === normalizarTexto(categoria.nome)).length;
           return (
             <Pressable key={categoria.nome} accessibilityRole="button" onPress={() => abrirTela('objetos', { categoria: categoria.nome })} style={estilos.categoria}>
-              <View style={estilos.iconeCategoria}><MaterialCommunityIcons name={categoria.ícone} size={20} color={cores.primario} /></View>
+              <View style={estilos.iconeCategoria}>{categoria.objetoRepresentativo ? <ImagemObjeto nome={categoria.objetoRepresentativo.name} categoria={categoria.objetoRepresentativo.category} tamanho={12} compacto /> : <MaterialCommunityIcons name={categoria.ícone} size={20} color={cores.primario} />}</View>
               <Text style={estilos.nomeCategoria}>{categoria.nome}</Text>
               <Text style={estilos.quantidadeCategoria}>{quantidade} {quantidade === 1 ? 'item' : 'itens'}</Text>
             </Pressable>

@@ -9,6 +9,7 @@ import { cores, raios } from '../tema';
 import { categoriasDeObjeto, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
 
 const CATEGORIA_PERSONALIZADA = '__personalizada__';
+type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string } };
 
 export default function TelaObjetos({ objetos, definirObjetos, api, categoriaInicial, notificar }) {
   const [nome, setNome] = useState('');
@@ -27,11 +28,15 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
   const [essencialEdicao, setEssencialEdicao] = useState(false);
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
-  const categoriasDisponiveis = useMemo(() => {
+  const categoriasDisponiveis = useMemo<CategoriaComRepresentante[]>(() => {
     const predefinidas = new Set(categoriasDeObjeto.map((opção) => normalizarTexto(opção.nome)));
-    const personalizadas = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter((nome) => nome.length > 0))]
+    const personalizadas: CategoriaComRepresentante[] = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter((nome) => nome.length > 0))]
       .filter((nome) => !predefinidas.has(normalizarTexto(nome)))
-      .map((nome) => ({ nome, ícone: 'tag-outline' as const }));
+      .map((nome) => ({
+        nome,
+        ícone: 'tag-outline' as const,
+        objetoRepresentativo: objetos.find((objeto) => normalizarTexto(String(objeto.category || '')) === normalizarTexto(nome)),
+      }));
     return [...categoriasDeObjeto, ...personalizadas];
   }, [objetos]);
 
@@ -156,7 +161,9 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
         <View style={estilos.gradeCategorias}>
           {categoriasDisponiveis.map((opção) => (
             <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoria === opção.nome }} onPress={() => setCategoria(opção.nome)} style={[estilos.opcaoCategoria, categoria === opção.nome && estilos.opcaoCategoriaAtiva]}>
-              <MaterialCommunityIcons name={opção.ícone} size={16} color={categoria === opção.nome ? cores.primario : cores.textoSuave} />
+              {opção.objetoRepresentativo
+                ? <ImagemObjeto nome={opção.objetoRepresentativo.name} categoria={opção.objetoRepresentativo.category} tamanho={16} compacto />
+                : <MaterialCommunityIcons name={opção.ícone} size={16} color={categoria === opção.nome ? cores.primario : cores.textoSuave} />}
               <Text style={[estilos.textoCategoria, categoria === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text>
             </Pressable>
           ))}
@@ -220,7 +227,7 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
             <CampoTexto rótulo="Nome do objeto" value={nomeEdicao} onChangeText={setNomeEdicao} maxLength={120} />
             <Text style={estilos.rotuloCategoria}>Categoria</Text>
             <View style={estilos.gradeCategorias}>
-              {categoriasDisponiveis.map((opção) => <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoriaEdicao === opção.nome }} onPress={() => setCategoriaEdicao(opção.nome)} style={[estilos.opcaoCategoria, categoriaEdicao === opção.nome && estilos.opcaoCategoriaAtiva]}><MaterialCommunityIcons name={opção.ícone} size={16} color={categoriaEdicao === opção.nome ? cores.primario : cores.textoSuave} /><Text style={[estilos.textoCategoria, categoriaEdicao === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text></Pressable>)}
+              {categoriasDisponiveis.map((opção) => <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoriaEdicao === opção.nome }} onPress={() => setCategoriaEdicao(opção.nome)} style={[estilos.opcaoCategoria, categoriaEdicao === opção.nome && estilos.opcaoCategoriaAtiva]}>{opção.objetoRepresentativo ? <ImagemObjeto nome={opção.objetoRepresentativo.name} categoria={opção.objetoRepresentativo.category} tamanho={16} compacto /> : <MaterialCommunityIcons name={opção.ícone} size={16} color={categoriaEdicao === opção.nome ? cores.primario : cores.textoSuave} />}<Text style={[estilos.textoCategoria, categoriaEdicao === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text></Pressable>)}
               <Pressable accessibilityRole="radio" accessibilityState={{ selected: categoriaEdicao === CATEGORIA_PERSONALIZADA }} onPress={() => setCategoriaEdicao(CATEGORIA_PERSONALIZADA)} style={[estilos.opcaoCategoria, categoriaEdicao === CATEGORIA_PERSONALIZADA && estilos.opcaoCategoriaAtiva]}><Ionicons name="add-circle-outline" size={16} color={categoriaEdicao === CATEGORIA_PERSONALIZADA ? cores.primario : cores.textoSuave} /><Text style={[estilos.textoCategoria, categoriaEdicao === CATEGORIA_PERSONALIZADA && estilos.textoCategoriaAtiva]}>Personalizada</Text></Pressable>
             </View>
             {categoriaEdicao === CATEGORIA_PERSONALIZADA ? <CampoTexto rótulo="Nome da categoria" value={categoriaEdicaoPersonalizada} onChangeText={setCategoriaEdicaoPersonalizada} placeholder="Ex.: Equipamento esportivo" maxLength={80} /> : null}
