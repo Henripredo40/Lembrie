@@ -496,7 +496,7 @@ export default function App() {
 
   let conteúdo;
   if (tela === 'inicio') {
-    conteúdo = <TelaInicio perfil={perfil} seguranca={seguranca} mostrarResumoLogin={false} mostrarAtalhosFlutuantes={dimensoesJanela.width >= 760} objetos={objetos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} sugestaoGPS={sugestaoGPS} />;
+    conteúdo = <TelaInicio perfil={perfil} seguranca={seguranca} mostrarResumoLogin={false} mostrarAtalhosFlutuantes={dimensoesJanela.width >= 760} compacto={Platform.OS !== 'web' && dimensoesJanela.width < 760} objetos={objetos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} sugestaoGPS={sugestaoGPS} />;
   } else if (tela === 'objetos') {
     conteúdo = <TelaObjetos objetos={objetos} definirObjetos={definirObjetos} api={chamarApi} categoriaInicial={categoriaInicial} notificar={notificar} />;
   } else if (tela === 'bluetooth') {

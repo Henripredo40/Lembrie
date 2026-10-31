@@ -310,8 +310,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     try {
       const local = await api(`/places/reverse?lat=${latitude}&lon=${longitude}`);
       if (idBusca !== buscaPontoAtual.current) return;
-      // Preserve the exact coordinate selected by the user; reverse geocoding
-      // is only used to supply a readable address and destination label.
+      // Mantém o ponto exato escolhido no mapa e usa o endereço só para mostrar o local.
       const localSelecionado = { ...local, latitude, longitude };
       definirSelecionado(localSelecionado);
       definirCepsDoEndereco(local.cep ? [{ cep: local.cep, bairro: local.bairro || '' }] : []);
@@ -358,7 +357,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       <MapaOSM
         latitude={selecionado?.latitude ?? -15.7939}
         longitude={selecionado?.longitude ?? -47.8828}
-        onChoose={escolherPontoNoMapa}
+        aoEscolher={escolherPontoNoMapa}
       />
       <Text style={estilos.atribuição}>Mapa © OpenStreetMap contributors</Text>
       {selecionado ? <>

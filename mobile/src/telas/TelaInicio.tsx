@@ -5,12 +5,12 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, EstadoVazio, TituloSecao } from '../componentes/Elementos';
-import { cores, raios } from '../tema';
+import { cores } from '../tema';
 import { categoriasDeObjeto, chaveiroEstáConectado, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
 
 type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string }; rotina?: boolean };
 
-export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = true, mostrarAtalhosFlutuantes = true, objetos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
+export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = true, mostrarAtalhosFlutuantes = true, compacto = false, objetos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
   const [categoriasDaRotina, definirCategoriasDaRotina] = useState<string[]>([]);
 
   useEffect(() => {
@@ -74,17 +74,17 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
   return (
     <View style={estilos.tela}>
     <ScrollView
-      contentContainerStyle={estilos.conteudo}
+      contentContainerStyle={[estilos.conteudo, compacto && estilos.conteudoCompacto]}
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={atualizando} onRefresh={atualizar} tintColor={cores.primario} colors={[cores.primario]} />}
     >
-      <View style={estilos.cabecalhoBoasVindas}>
+      <View style={[estilos.cabecalhoBoasVindas, compacto && estilos.cabecalhoBoasVindasCompacto]}>
         <View style={estilos.blocoTexto}>
-          <Text style={estilos.saudacao}>OLÁ, {nome.toLocaleUpperCase('pt-BR')}</Text>
-          <Text style={estilos.titulo}>Vamos cuidar do que importa?</Text>
-          <Text style={estilos.subtitulo}>Seus objetos, organizados em um só lugar.</Text>
+          <Text style={[estilos.saudacao, compacto && estilos.saudacaoCompacta]}>OLÁ, {nome.toLocaleUpperCase('pt-BR')}</Text>
+          <Text style={[estilos.titulo, compacto && estilos.tituloCompacto]}>Vamos cuidar do que importa?</Text>
+          <Text style={[estilos.subtitulo, compacto && estilos.subtituloCompacto]}>Seus objetos, organizados em um só lugar.</Text>
         </View>
-        <View style={estilos.avatar}><Text style={estilos.letraAvatar}>{nome.charAt(0).toLocaleUpperCase('pt-BR')}</Text></View>
+        <View style={[estilos.avatar, compacto && estilos.avatarCompacto]}><Text style={estilos.letraAvatar}>{nome.charAt(0).toLocaleUpperCase('pt-BR')}</Text></View>
       </View>
 
       {mostrarResumoLogin ? <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes do último login" onPress={() => abrirTela('acesso')} style={estilos.cartaoUltimoAcesso}>
@@ -98,7 +98,7 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
 
       {erroConexao ? <Aviso ícone="cloud-offline-outline" tom="alerta" texto={erroConexao} /> : null}
 
-      {sugestaoGPS?.items?.length || sugestaoGPS?.registeredItems?.length ? <View style={estilos.cartaoSugestaoGPS}>
+      {sugestaoGPS?.items?.length || sugestaoGPS?.registeredItems?.length ? <View style={[estilos.cartaoSugestaoGPS, compacto && estilos.cartaoSugestaoGPSCompacto]}>
         <View style={estilos.cabecalhoSugestaoGPS}><Ionicons name="sparkles" size={18} color={cores.primario} /><Text style={estilos.tituloSugestaoGPS}>Sugestão para este local</Text></View>
         <Text style={estilos.textoSugestaoGPS}>{sugestaoGPS.destination}</Text>
         {sugestaoGPS.registeredItems?.length ? <Text style={estilos.textoSugestaoGPS}>Da sua lista: {sugestaoGPS.registeredItems.join(', ')}.</Text> : null}
@@ -106,7 +106,7 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
         <Text style={estilos.legendaSugestaoGPS}>{sugestaoGPS.ai ? 'Recomendação personalizada pela IA Gemini' : 'Sugestão local do Lembriê · IA ainda não configurada'}</Text>
       </View> : null}
 
-      <View style={estilos.busca}>
+      <View style={[estilos.busca, compacto && estilos.buscaCompacta]}>
         <Ionicons name="search-outline" size={20} color={cores.textoSuave} />
         <TextInput
           accessibilityLabel="Buscar objeto"
@@ -115,7 +115,7 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
           placeholder="Buscar por nome ou categoria"
           placeholderTextColor={cores.textoSuave}
           returnKeyType="search"
-          style={estilos.campoBusca}
+          style={[estilos.campoBusca, compacto && estilos.campoBuscaCompacto]}
         />
         {busca ? <Pressable accessibilityRole="button" accessibilityLabel="Limpar busca" onPress={() => definirBusca('')} hitSlop={8}><Ionicons name="close-circle" size={20} color="#98A2B3" /></Pressable> : null}
       </View>
@@ -128,41 +128,41 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
       ) : (
         <>
 
-      <View style={estilos.cartaoChaveiro}>
+      <View style={[estilos.cartaoChaveiro, compacto && estilos.cartaoChaveiroCompacto]}>
         <View style={estilos.linhaChaveiro}>
           <View style={estilos.iconeChaveiro}><MaterialCommunityIcons name="bluetooth" size={24} color={cores.branco} /></View>
           <View style={estilos.infoChaveiro}>
-            <Text style={estilos.rotuloChaveiro}>SEU CHAVEIRO</Text>
-            <Text style={estilos.tituloChaveiro}>
+            <Text style={[estilos.rotuloChaveiro, compacto && estilos.rotuloChaveiroCompacto]}>SEU CHAVEIRO</Text>
+            <Text style={[estilos.tituloChaveiro, compacto && estilos.tituloChaveiroCompacto]}>
               {detectados > 0 ? detectados + (detectados === 1 ? ' dispositivo detectado' : ' dispositivos detectados') : vinculados > 0 ? 'Aguardando o primeiro sinal' : 'Chaveiro não associado'}
             </Text>
-            <Text style={estilos.textoChaveiro}>
+            <Text style={[estilos.textoChaveiro, compacto && estilos.textoChaveiroCompacto]}>
               {detectados > 0 ? 'O aplicativo recebeu um sinal do chaveiro.' : vinculados > 0 ? 'O dispositivo está associado, mas ainda não enviou sinal.' : 'A detecção por proximidade e os alertas Bluetooth exigem um chaveiro compatível associado ao objeto.'}
             </Text>
           </View>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => abrirTela('bluetooth')} style={estilos.botaoChaveiro}>
-          <Text style={estilos.textoBotaoChaveiro}>Abrir Bluetooth</Text>
+        <Pressable accessibilityRole="button" onPress={() => abrirTela('bluetooth')} style={[estilos.botaoChaveiro, compacto && estilos.botaoChaveiroCompacto]}>
+          <Text style={[estilos.textoBotaoChaveiro, compacto && estilos.textoBotaoChaveiroCompacto]}>Abrir Bluetooth</Text>
           <Ionicons name="arrow-forward" size={17} color={cores.branco} />
         </Pressable>
       </View>
 
       <TituloSecao título="RESUMO" />
-      <View style={estilos.resumos}>
-        <Resumo ícone="cube-outline" número={objetos.length} legenda="Objetos" cor={cores.primario} fundo={cores.primarioClaro} />
-        <Resumo ícone="star-outline" número={essenciais} legenda="Essenciais" cor="#A85B11" fundo="#FFF3E3" />
-        <Resumo ícone="bluetooth" número={vinculados} legenda="Associados" cor="#2872B8" fundo="#EAF5FF" />
+      <View style={[estilos.resumos, compacto && estilos.resumosCompactos]}>
+        <Resumo compacto={compacto} ícone="cube-outline" número={objetos.length} legenda="Objetos" cor={cores.primario} fundo={cores.primarioClaro} />
+        <Resumo compacto={compacto} ícone="star-outline" número={essenciais} legenda="Essenciais" cor="#A85B11" fundo="#FFF3E3" />
+        <Resumo compacto={compacto} ícone="bluetooth" número={vinculados} legenda="Associados" cor="#2872B8" fundo="#EAF5FF" />
       </View>
 
       <TituloSecao título="CATEGORIAS" ação="Ver objetos" aoPressionar={() => abrirTela('objetos')} />
-      <View style={estilos.gradeCategoriasInicio}>
+      <View style={[estilos.gradeCategoriasInicio, compacto && estilos.gradeCategoriasCompacta]}>
         {categoriasVisiveis.map((categoria) => {
           const quantidade = objetos.filter((objeto) => normalizarTexto(objeto.category) === normalizarTexto(categoria.nome)).length;
           return (
-            <Pressable key={categoria.nome} accessibilityRole="button" onPress={() => abrirTela('objetos', { categoria: categoria.nome })} style={estilos.categoria}>
-              <View style={estilos.iconeCategoria}>{categoria.objetoRepresentativo ? <ImagemObjeto nome={categoria.objetoRepresentativo.name} categoria={categoria.objetoRepresentativo.category} imagemUri={categoria.objetoRepresentativo.image_data} tamanho={12} compacto /> : <MaterialCommunityIcons name={categoria.ícone} size={20} color={cores.primario} />}</View>
-              <Text style={estilos.nomeCategoria}>{categoria.nome}</Text>
-              <Text style={estilos.quantidadeCategoria}>{quantidade} {quantidade === 1 ? 'item' : 'itens'}</Text>
+            <Pressable key={categoria.nome} accessibilityRole="button" onPress={() => abrirTela('objetos', { categoria: categoria.nome })} style={[estilos.categoria, compacto && estilos.categoriaCompacta]}>
+              <View style={[estilos.iconeCategoria, compacto && estilos.iconeCategoriaCompacto]}>{categoria.objetoRepresentativo ? <ImagemObjeto nome={categoria.objetoRepresentativo.name} categoria={categoria.objetoRepresentativo.category} imagemUri={categoria.objetoRepresentativo.image_data} tamanho={12} compacto /> : <MaterialCommunityIcons name={categoria.ícone} size={20} color={cores.primario} />}</View>
+              <Text style={[estilos.nomeCategoria, compacto && estilos.nomeCategoriaCompacto]}>{categoria.nome}</Text>
+              <Text style={[estilos.quantidadeCategoria, compacto && estilos.quantidadeCategoriaCompacta]}>{quantidade} {quantidade === 1 ? 'item' : 'itens'}</Text>
               {categoria.rotina ? <Text style={estilos.rotuloRotinaCategoria}>Para sua rotina</Text> : null}
             </Pressable>
           );
@@ -185,9 +185,9 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
         </View>
       )}
 
-      <View style={estilos.atalhos}>
-        <Atalho ícone="exit-outline" título="Conferir antes de sair" texto="Monte sua lista" aoPressionar={() => abrirTela('saida')} />
-        <Atalho ícone="map-outline" título="Planejar destino" texto="Veja sugestões para onde vai" aoPressionar={() => abrirTela('mapa')} />
+      <View style={[estilos.atalhos, compacto && estilos.atalhosCompactos]}>
+        <Atalho compacto={compacto} ícone="exit-outline" título="Conferir antes de sair" texto="Monte sua lista" aoPressionar={() => abrirTela('saida')} />
+        <Atalho compacto={compacto} ícone="map-outline" título="Planejar destino" texto="Veja sugestões para onde vai" aoPressionar={() => abrirTela('mapa')} />
       </View>
 
       {mostrarAlertas && essenciais > 0 && vinculados === 0 ? (
@@ -213,22 +213,22 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
   );
 }
 
-function Resumo({ ícone, número, legenda, cor, fundo }) {
+function Resumo({ compacto, ícone, número, legenda, cor, fundo }) {
   return (
-    <View style={estilos.cartaoResumo}>
-      <View style={[estilos.iconeResumo, { backgroundColor: fundo }]}><MaterialCommunityIcons name={ícone} size={18} color={cor} /></View>
-      <Text style={estilos.numeroResumo}>{número}</Text>
-      <Text style={estilos.legendaResumo}>{legenda}</Text>
+    <View style={[estilos.cartaoResumo, compacto && estilos.cartaoResumoCompacto]}>
+      <View style={[estilos.iconeResumo, compacto && estilos.iconeResumoCompacto, { backgroundColor: fundo }]}><MaterialCommunityIcons name={ícone} size={18} color={cor} /></View>
+      <Text style={[estilos.numeroResumo, compacto && estilos.numeroResumoCompacto]}>{número}</Text>
+      <Text style={[estilos.legendaResumo, compacto && estilos.legendaResumoCompacta]}>{legenda}</Text>
     </View>
   );
 }
 
-function Atalho({ ícone, título, texto, aoPressionar }) {
+function Atalho({ compacto, ícone, título, texto, aoPressionar }) {
   return (
-    <Pressable accessibilityRole="button" onPress={aoPressionar} style={({ pressed }) => [estilos.atalho, pressed && { opacity: 0.8 }]}>
-      <View style={estilos.iconeAtalho}><Ionicons name={ícone} size={20} color={cores.primario} /></View>
+    <Pressable accessibilityRole="button" onPress={aoPressionar} style={({ pressed }) => [estilos.atalho, compacto && estilos.atalhoCompacto, pressed && { opacity: 0.8 }]}>
+      <View style={[estilos.iconeAtalho, compacto && estilos.iconeAtalhoCompacto]}><Ionicons name={ícone} size={20} color={cores.primario} /></View>
       <Text style={estilos.tituloAtalho}>{título}</Text>
-      <Text style={estilos.textoAtalho}>{texto}</Text>
+      <Text style={[estilos.textoAtalho, compacto && estilos.textoAtalhoCompacto]}>{texto}</Text>
     </Pressable>
   );
 }
