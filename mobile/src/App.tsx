@@ -567,7 +567,7 @@ export default function App() {
             <ItemNavegação ativo={tela === 'objetos'} ícone="cube-outline" íconeAtivo="cube" rótulo="Objetos" aoPressionar={() => abrirTela('objetos')} />
             <ItemNavegação ativo={tela === 'bluetooth'} ícone="bluetooth-outline" íconeAtivo="bluetooth" rótulo="Bluetooth" aoPressionar={() => abrirTela('bluetooth')} />
             <ItemNavegação ativo={tela === 'saida'} ícone="checkbox-outline" íconeAtivo="checkbox" rótulo="Saída" aoPressionar={() => abrirTela('saida')} />
-            <ItemNavegação ativo={menuAberto || ['mapa', 'historico', 'configuracoes', 'perfil', 'acesso'].includes(tela)} ícone="grid-outline" íconeAtivo="grid" rótulo="Mais" aoPressionar={() => definirMenuAberto(true)} />
+            <ItemNavegação ativo={menuAberto || ['mapa', 'historico', 'configuracoes', 'perfil', 'acesso', 'assistente'].includes(tela)} ícone="grid-outline" íconeAtivo="grid" rótulo="Mais" aoPressionar={() => definirMenuAberto(true)} />
           </View>
         </SafeAreaView>
 
@@ -578,6 +578,8 @@ export default function App() {
               <View style={estilos.alçaMenu} />
               <View style={estilos.cabeçalhoMenu}><View><Text style={estilos.tituloMenu}>Mais opções</Text><Text style={estilos.subtituloMenu}>{perfil?.name || perfil?.email || 'Sua conta'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Fechar menu" onPress={() => definirMenuAberto(false)} style={estilos.fecharMenu}><Ionicons name="close" size={20} color={cores.texto} /></Pressable></View>
               <View style={estilos.listaMenu}>
+                <ItemMenu ativo={tela === 'mapa'} ícone="map-outline" título="Mapa e rotina" texto="Pesquise destinos e planeje o que levar" aoPressionar={() => abrirTela('mapa')} />
+                <ItemMenu ativo={tela === 'assistente'} ícone="sparkles-outline" título="Ajuda" texto="Tire dúvidas e receba orientações" aoPressionar={() => abrirTela('assistente')} />
                 <ItemMenu ativo={tela === 'historico'} ícone="time-outline" título="Histórico" texto="Atividades recentes" aoPressionar={() => abrirTela('historico')} />
                 <ItemMenu ativo={tela === 'acesso'} ícone="shield-checkmark-outline" título="Acesso e segurança" texto="Confira o último login da conta" aoPressionar={() => abrirTela('acesso')} />
                 <ItemMenu ativo={tela === 'perfil'} ícone="person-circle-outline" título="Meu perfil" texto="Atualize seus dados e senha" aoPressionar={() => abrirTela('perfil')} />
