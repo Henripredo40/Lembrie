@@ -11,7 +11,7 @@ import { formatarData } from '../utils/date';
 
 type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string }; rotina?: boolean };
 
-export default function TelaInicio({ perfil, seguranca, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
+export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = true, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
   const [categoriasDaRotina, definirCategoriasDaRotina] = useState<string[]>([]);
 
   useEffect(() => {
@@ -88,14 +88,14 @@ export default function TelaInicio({ perfil, seguranca, objetos, eventos, busca,
         <View style={estilos.avatar}><Text style={estilos.letraAvatar}>{nome.charAt(0).toLocaleUpperCase('pt-BR')}</Text></View>
       </View>
 
-      <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes do último login" onPress={() => abrirTela('perfil')} style={estilos.cartaoUltimoAcesso}>
+      {mostrarResumoLogin ? <Pressable accessibilityRole="button" accessibilityLabel="Ver detalhes do último login" onPress={() => abrirTela('perfil')} style={estilos.cartaoUltimoAcesso}>
         <View style={estilos.iconeUltimoAcesso}><Ionicons name="shield-checkmark" size={18} color={cores.primario} /></View>
         <View style={estilos.detalheUltimoAcesso}>
           <View style={estilos.linhaUltimoAcesso}><Text style={estilos.rotuloUltimoAcesso}>ÚLTIMO LOGIN</Text><Text style={estilos.dataUltimoAcesso}>{textoUltimoAcesso}</Text></View>
           {sessaoRecente?.device_label ? <Text numberOfLines={1} ellipsizeMode="tail" style={estilos.dispositivoUltimoAcesso}>{sessaoRecente.device_label}{sessaoRecente.location_label ? ' · ' + sessaoRecente.location_label : ''}</Text> : <Text style={estilos.dispositivoUltimoAcesso}>Toque para ver o histórico de segurança</Text>}
         </View>
         <View style={estilos.atalhoUltimoAcesso}><Ionicons name="chevron-forward" size={17} color={cores.primario} /></View>
-      </Pressable>
+      </Pressable> : null}
 
       {erroConexao ? <Aviso ícone="cloud-offline-outline" tom="alerta" texto={erroConexao} /> : null}
 

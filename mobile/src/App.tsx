@@ -1,6 +1,6 @@
 import estilos from './estilos/App.estilos';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Linking, Modal, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Linking, Modal, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -34,6 +34,7 @@ function identificarDispositivo() {
 }
 
 export default function App() {
+  const dimensoesJanela = useWindowDimensions();
   const [token, definirToken] = useState(null);
   const [restaurando, definirRestaurando] = useState(true);
   const [tela, definirTela] = useState('inicio');
@@ -58,6 +59,11 @@ export default function App() {
   const sessãoConta = useRef<string | null>(null);
   const [idSessãoConta, definirIdSessãoConta] = useState<string | null>(null);
   const localEnviadoNaSessão = useRef<string | null>(null);
+  const sessaoMaisRecente = seguranca?.sessions?.[0];
+  const dataUltimoLogin = seguranca?.last_login ? new Date(String(seguranca.last_login).replace(' ', 'T')) : null;
+  const textoUltimoLogin = dataUltimoLogin && !Number.isNaN(dataUltimoLogin.getTime())
+    ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(dataUltimoLogin)
+    : 'Consultando último login';
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -489,7 +495,7 @@ export default function App() {
 
   let conteúdo;
   if (tela === 'inicio') {
-    conteúdo = <TelaInicio perfil={perfil} seguranca={seguranca} objetos={objetos} eventos={eventos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} sugestaoGPS={sugestaoGPS} />;
+    conteúdo = <TelaInicio perfil={perfil} seguranca={seguranca} mostrarResumoLogin={Platform.OS !== 'web' || dimensoesJanela.width < 760} objetos={objetos} eventos={eventos} busca={busca} definirBusca={definirBusca} abrirTela={abrirTela} atualizar={() => carregarDados(false)} atualizando={atualizando} erroConexao={erroConexão} mostrarAlertas={preferênciaAtiva(preferências.preventive_alerts)} api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} sugestaoGPS={sugestaoGPS} />;
   } else if (tela === 'objetos') {
     conteúdo = <TelaObjetos objetos={objetos} definirObjetos={definirObjetos} api={chamarApi} categoriaInicial={categoriaInicial} notificar={notificar} />;
   } else if (tela === 'bluetooth') {
@@ -520,6 +526,15 @@ export default function App() {
         <View style={estilos.cabecalho}>
           <View style={estilos.marcaCabecalho}><MaterialCommunityIcons name="map-marker-check" size={22} color={cores.branco} /></View>
           <View style={estilos.textosCabecalho}><Text style={estilos.nomeApp}>LEMBRIÊ</Text><Text numberOfLines={1} ellipsizeMode="tail" style={estilos.tituloCabecalho}>{título}</Text></View>
+          {Platform.OS === 'web' && dimensoesJanela.width >= 760 && tela === 'inicio' ? <Pressable accessibilityRole="button" accessibilityLabel={'Abrir detalhes do último login: ' + textoUltimoLogin} onPress={() => abrirTela('perfil')} style={estilos.resumoLoginCabecalho}>
+            <View style={estilos.iconeResumoLoginCabecalho}><Ionicons name="shield-checkmark" size={19} color={cores.primario} /></View>
+            <View style={estilos.textoResumoLoginCabecalho}>
+              <Text style={estilos.rotuloResumoLoginCabecalho}>ÚLTIMO LOGIN</Text>
+              <Text numberOfLines={1} style={estilos.dataResumoLoginCabecalho}>{textoUltimoLogin}</Text>
+              {sessaoMaisRecente?.device_label ? <Text numberOfLines={1} style={estilos.dispositivoResumoLoginCabecalho}>{sessaoMaisRecente.device_label}{sessaoMaisRecente.location_label ? ' · ' + sessaoMaisRecente.location_label : ''}</Text> : null}
+            </View>
+            <Ionicons name="chevron-forward" size={17} color={cores.primario} />
+          </Pressable> : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Atualizar dados" onPress={() => carregarDados(false)} hitSlop={9} style={estilos.botaoAtualizar}>
             {atualizando ? <ActivityIndicator size="small" color={cores.primario} /> : <Ionicons name="refresh-outline" size={20} color={cores.primario} />}
           </Pressable>
