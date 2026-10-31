@@ -16,4 +16,5 @@ Imagens ilustrativas para apresentar as principais áreas do site e do app. Cada
 
 ## Arquivos
 
-Os SVGs estão neste diretório para ficarem separados do código do aplicativo e da API. Para regenerar as imagens, execute node gerar-imagens.mjs.
+Os SVGs estão neste diretório para ficarem separados do código do aplicativo e da API. Para regenerar as imagens, execute node imagem-site.mjs.
+
