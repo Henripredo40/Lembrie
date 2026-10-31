@@ -538,7 +538,10 @@ export default function App() {
             </View>
             <Ionicons name="chevron-forward" size={17} color={cores.primario} />
           </Pressable> : null}
-          <Pressable accessibilityRole="button" accessibilityLabel="Atualizar dados" onPress={() => carregarDados(false)} hitSlop={9} style={estilos.botaoAtualizar}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Recarregar página e dados" onPress={() => {
+            if (Platform.OS === 'web') window.location.reload();
+            else void carregarDados(false);
+          }} hitSlop={9} style={estilos.botaoAtualizar}>
             {atualizando ? <ActivityIndicator size="small" color={cores.primario} /> : <Ionicons name="refresh-outline" size={20} color={cores.primario} />}
           </Pressable>
         </View>
