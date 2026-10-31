@@ -1,7 +1,9 @@
 import estilos from '../estilos/TelaObjetos.estilos';
 import React, { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,  Switch, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, Botao, CampoTexto, EstadoVazio, TituloSecao } from '../componentes/Elementos';
@@ -9,13 +11,15 @@ import { cores, raios } from '../tema';
 import { categoriasDeObjeto, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
 
 const CATEGORIA_PERSONALIZADA = '__personalizada__';
-type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string } };
+type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string; image_data?: string | null } };
 
 export default function TelaObjetos({ objetos, definirObjetos, api, categoriaInicial, notificar }) {
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState('Chaves');
   const [categoriaPersonalizada, setCategoriaPersonalizada] = useState('');
   const [essencial, setEssencial] = useState(false);
+  const [foto, setFoto] = useState<string | null>(null);
+  const [fotoEdicao, setFotoEdicao] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState('');
   const [busca, setBusca] = useState('');
@@ -59,6 +63,24 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
   const categoriaParaSalvar = categoria === CATEGORIA_PERSONALIZADA ? categoriaPersonalizada.trim() : categoria;
   const categoriaEdicaoParaSalvar = categoriaEdicao === CATEGORIA_PERSONALIZADA ? categoriaEdicaoPersonalizada.trim() : categoriaEdicao;
 
+  async function escolherFoto(definirFoto: (imagem: string | null) => void) {
+    try {
+      const resultado = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
+      if (resultado.canceled || !resultado.assets?.[0]) return;
+      const asset = resultado.assets[0];
+      const resize = asset.width >= asset.height ? { width: 480 } : { height: 480 };
+      let reduzida = await ImageManipulator.manipulateAsync(asset.uri, [{ resize }], { compress: 0.68, format: ImageManipulator.SaveFormat.JPEG, base64: true });
+      if (!reduzida.base64) throw new Error('Não foi possível preparar a foto. Escolha outra imagem.');
+      if (reduzida.base64.length > 630000) {
+        reduzida = await ImageManipulator.manipulateAsync(asset.uri, [{ resize: asset.width >= asset.height ? { width: 360 } : { height: 360 } }], { compress: 0.55, format: ImageManipulator.SaveFormat.JPEG, base64: true });
+      }
+      if (!reduzida.base64 || reduzida.base64.length > 630000) throw new Error('Essa foto ficou grande demais. Escolha uma imagem menor.');
+      definirFoto('data:image/jpeg;base64,' + reduzida.base64);
+    } catch (erro) {
+      notificar(erro.message || 'Não foi possível abrir essa foto.');
+    }
+  }
+
   async function cadastrarObjeto() {
     if (!nome.trim()) {
       setErroFormulario('Dê um nome para o objeto.');
@@ -73,14 +95,15 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
     try {
       const novo = await api('/objects', {
         method: 'POST',
-        body: JSON.stringify({ name: nome.trim(), category: categoriaParaSalvar, essential: essencial }),
+        body: JSON.stringify({ name: nome.trim(), category: categoriaParaSalvar, essential: essencial, image_data: foto }),
       });
       definirObjetos((atuais) => [novo, ...atuais]);
       setNome('');
       setCategoria('Chaves');
       setCategoriaPersonalizada('');
       setEssencial(false);
-      notificar('Objeto cadastrado. A ilustração foi escolhida automaticamente pela categoria e pelo nome.');
+      setFoto(null);
+      notificar(foto ? 'Objeto cadastrado com a foto salva na sua conta.' : 'Objeto cadastrado. Você pode adicionar uma foto depois.');
     } catch (erro) {
       setErroFormulario(erro.message || 'Não foi possível cadastrar o objeto. Confira sua conexão e tente novamente.');
     } finally {
@@ -96,6 +119,7 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
     setCategoriaEdicao(categoriaDisponivel ? categoriaDisponivel.nome : CATEGORIA_PERSONALIZADA);
     setCategoriaEdicaoPersonalizada(categoriaDisponivel ? '' : categoriaAtual);
     setEssencialEdicao(objetoÉEssencial(objeto));
+    setFotoEdicao(objeto.image_data || null);
   }
 
   async function salvarEdicao() {
@@ -111,10 +135,10 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
     try {
       await api('/objects/' + editando.id, {
         method: 'PATCH',
-        body: JSON.stringify({ name: nomeEdicao.trim(), category: categoriaEdicaoParaSalvar, essential: essencialEdicao }),
+        body: JSON.stringify({ name: nomeEdicao.trim(), category: categoriaEdicaoParaSalvar, essential: essencialEdicao, image_data: fotoEdicao }),
       });
       definirObjetos((atuais) => atuais.map((objeto) => String(objeto.id) === String(editando.id)
-        ? { ...objeto, name: nomeEdicao.trim(), category: categoriaEdicaoParaSalvar, essential: essencialEdicao, important: essencialEdicao }
+        ? { ...objeto, name: nomeEdicao.trim(), category: categoriaEdicaoParaSalvar, image_data: fotoEdicao, essential: essencialEdicao, important: essencialEdicao }
         : objeto));
       setEditando(null);
       notificar('Alterações salvas.');
@@ -154,8 +178,8 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
       <View style={estilos.formulario}>
         <View style={estilos.cabecalhoFormulario}>
           <View style={estilos.miniIcone}><Ionicons name="add" size={19} color={cores.primario} /></View>
-          <View style={{ flex: 1 }}><Text style={estilos.tituloFormulario}>Adicionar objeto</Text><Text style={estilos.legendaFormulario}>A imagem muda conforme o nome e a categoria.</Text></View>
-          <ImagemObjeto nome={nome} categoria={categoria === CATEGORIA_PERSONALIZADA ? categoriaPersonalizada : categoria} tamanho={25} compacto />
+          <View style={{ flex: 1 }}><Text style={estilos.tituloFormulario}>Adicionar objeto</Text><Text style={estilos.legendaFormulario}>Escolha uma foto ou use a ilustração automática.</Text></View>
+          <ImagemObjeto nome={nome} categoria={categoria === CATEGORIA_PERSONALIZADA ? categoriaPersonalizada : categoria} imagemUri={foto} tamanho={25} compacto />
         </View>
 
         <CampoTexto rótulo="Nome do objeto" value={nome} onChangeText={(valor) => { setNome(valor); setErroFormulario(''); }} placeholder="Ex.: Chaves de casa" maxLength={120} returnKeyType="done" />
@@ -164,7 +188,7 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
           {categoriasDisponiveis.map((opção) => (
             <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoria === opção.nome }} onPress={() => setCategoria(opção.nome)} style={[estilos.opcaoCategoria, categoria === opção.nome && estilos.opcaoCategoriaAtiva]}>
               {opção.objetoRepresentativo
-                ? <ImagemObjeto nome={opção.objetoRepresentativo.name} categoria={opção.objetoRepresentativo.category} tamanho={16} compacto />
+                ? <ImagemObjeto nome={opção.objetoRepresentativo.name} categoria={opção.objetoRepresentativo.category} imagemUri={opção.objetoRepresentativo.image_data} tamanho={16} compacto />
                 : <MaterialCommunityIcons name={opção.ícone} size={16} color={categoria === opção.nome ? cores.primario : cores.textoSuave} />}
               <Text style={[estilos.textoCategoria, categoria === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text>
             </Pressable>
@@ -175,6 +199,8 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
           </Pressable>
         </View>
         {categoria === CATEGORIA_PERSONALIZADA ? <CampoTexto rótulo="Nome da categoria" value={categoriaPersonalizada} onChangeText={(valor) => { setCategoriaPersonalizada(valor); setErroFormulario(''); }} placeholder="Ex.: Equipamento esportivo" maxLength={80} /> : null}
+
+        <View style={estilos.linhaFoto}><View style={{ flex: 1 }}><Text style={estilos.tituloEssencial}>Foto do objeto</Text><Text style={estilos.textoEssencial}>A foto escolhida será salva na sua conta e aparecerá no app e no site.</Text></View><Pressable accessibilityRole="button" onPress={() => escolherFoto(setFoto)} style={estilos.botaoFoto}><Ionicons name="image-outline" size={17} color={cores.primario} /><Text style={estilos.textoBotaoFoto}>{foto ? 'Trocar' : 'Escolher'}</Text></Pressable>{foto ? <Pressable accessibilityRole="button" accessibilityLabel="Remover foto" onPress={() => setFoto(null)} style={estilos.botaoFoto}><Ionicons name="trash-outline" size={17} color={cores.vermelho} /></Pressable> : null}</View>
 
         <View style={estilos.linhaEssencial}>
           <View style={estilos.iconeEssencial}><Ionicons name="star" size={16} color="#A85B11" /></View>
@@ -207,7 +233,7 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
       </ScrollView>
 
       {objetos.length === 0 ? (
-        <EstadoVazio ícone="cube-outline" título="Ainda não há objetos" texto="Adicione o primeiro objeto usando o formulário acima. Você poderá associar um chaveiro Bluetooth depois." />
+        <EstadoVazio ícone="cube-outline" título="Ainda não há objetos" texto="Adicione o primeiro objeto pelo formulário acima. O cadastro funciona sem chaveiro; a associação Bluetooth é opcional." />
       ) : filtrados.length === 0 ? (
         <EstadoVazio ícone="search-outline" título="Nada encontrado" texto="Mude o texto da busca ou escolha outro filtro." />
       ) : (
@@ -225,11 +251,11 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
             <View style={{ width: 62 }} />
           </View>
           <ScrollView contentContainerStyle={estilos.conteudoModal} keyboardShouldPersistTaps="handled">
-            <View style={estilos.previaModal}><ImagemObjeto nome={nomeEdicao} categoria={categoriaEdicao === CATEGORIA_PERSONALIZADA ? categoriaEdicaoPersonalizada : categoriaEdicao} tamanho={38} /><Text style={estilos.textoPrevia}>Ilustração automática do objeto</Text></View>
+            <View style={estilos.previaModal}><ImagemObjeto nome={nomeEdicao} categoria={categoriaEdicao === CATEGORIA_PERSONALIZADA ? categoriaEdicaoPersonalizada : categoriaEdicao} imagemUri={fotoEdicao} tamanho={38} /><Text style={estilos.textoPrevia}>{fotoEdicao ? 'Foto escolhida para este objeto' : 'Ilustração automática do objeto'}</Text><View style={estilos.acoesFoto}><Pressable accessibilityRole="button" onPress={() => escolherFoto(setFotoEdicao)} style={estilos.botaoFoto}><Ionicons name="image-outline" size={17} color={cores.primario} /><Text style={estilos.textoBotaoFoto}>{fotoEdicao ? 'Trocar foto' : 'Escolher foto'}</Text></Pressable>{fotoEdicao ? <Pressable accessibilityRole="button" accessibilityLabel="Remover foto" onPress={() => setFotoEdicao(null)} style={estilos.botaoFoto}><Ionicons name="trash-outline" size={17} color={cores.vermelho} /><Text style={[estilos.textoBotaoFoto, { color: cores.vermelho }]}>Remover</Text></Pressable> : null}</View></View>
             <CampoTexto rótulo="Nome do objeto" value={nomeEdicao} onChangeText={setNomeEdicao} maxLength={120} />
             <Text style={estilos.rotuloCategoria}>Categoria</Text>
             <View style={estilos.gradeCategorias}>
-              {categoriasDisponiveis.map((opção) => <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoriaEdicao === opção.nome }} onPress={() => setCategoriaEdicao(opção.nome)} style={[estilos.opcaoCategoria, categoriaEdicao === opção.nome && estilos.opcaoCategoriaAtiva]}>{opção.objetoRepresentativo ? <ImagemObjeto nome={opção.objetoRepresentativo.name} categoria={opção.objetoRepresentativo.category} tamanho={16} compacto /> : <MaterialCommunityIcons name={opção.ícone} size={16} color={categoriaEdicao === opção.nome ? cores.primario : cores.textoSuave} />}<Text style={[estilos.textoCategoria, categoriaEdicao === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text></Pressable>)}
+              {categoriasDisponiveis.map((opção) => <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoriaEdicao === opção.nome }} onPress={() => setCategoriaEdicao(opção.nome)} style={[estilos.opcaoCategoria, categoriaEdicao === opção.nome && estilos.opcaoCategoriaAtiva]}>{opção.objetoRepresentativo ? <ImagemObjeto nome={opção.objetoRepresentativo.name} categoria={opção.objetoRepresentativo.category} imagemUri={opção.objetoRepresentativo.image_data} tamanho={16} compacto /> : <MaterialCommunityIcons name={opção.ícone} size={16} color={categoriaEdicao === opção.nome ? cores.primario : cores.textoSuave} />}<Text style={[estilos.textoCategoria, categoriaEdicao === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text></Pressable>)}
               <Pressable accessibilityRole="radio" accessibilityState={{ selected: categoriaEdicao === CATEGORIA_PERSONALIZADA }} onPress={() => setCategoriaEdicao(CATEGORIA_PERSONALIZADA)} style={[estilos.opcaoCategoria, categoriaEdicao === CATEGORIA_PERSONALIZADA && estilos.opcaoCategoriaAtiva]}><Ionicons name="add-circle-outline" size={16} color={categoriaEdicao === CATEGORIA_PERSONALIZADA ? cores.primario : cores.textoSuave} /><Text style={[estilos.textoCategoria, categoriaEdicao === CATEGORIA_PERSONALIZADA && estilos.textoCategoriaAtiva]}>Personalizada</Text></Pressable>
             </View>
             {categoriaEdicao === CATEGORIA_PERSONALIZADA ? <CampoTexto rótulo="Nome da categoria" value={categoriaEdicaoPersonalizada} onChangeText={setCategoriaEdicaoPersonalizada} placeholder="Ex.: Equipamento esportivo" maxLength={80} /> : null}

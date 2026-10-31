@@ -22,7 +22,7 @@ export default function TelaConfiguracoes({ perfil, configuracoes, salvarConfigu
       <LinhaPreferencia ícone="notifications-outline" título="Lembretes preventivos" texto="Mostrar lembretes dentro do aplicativo." valor={ativo(preferencias.preventive_alerts)} aoMudar={valor => alterar('preventive_alerts', valor)} desativada={salvando} />
       <LinhaPreferencia ícone="calendar-outline" título="Reconhecer minha rotina" texto="Guardar destinos salvos por você. Desativar apaga esses registros." valor={ativo(preferencias.routine_enabled)} aoMudar={valor => alterar('routine_enabled', valor)} desativada={salvando} />
       <LinhaPreferencia ícone="star-outline" título="Somente itens essenciais" texto="Usar apenas os itens essenciais nas listas de saída." valor={ativo(preferencias.essential_only)} aoMudar={valor => alterar('essential_only', valor)} desativada={salvando} />
-      <Aviso ícone="information-circle-outline" texto="A rotina usa apenas destinos que você salva manualmente. Os alertas do chaveiro dependem do firmware físico." />
+      <Aviso ícone="information-circle-outline" texto="A rotina usa apenas destinos que você salva manualmente. Os alertas de proximidade exigem um chaveiro Bluetooth compatível, ligado e associado." />
       <TituloSecao título="SUA CONTA" />
       <Pressable accessibilityRole="button" onPress={sairDaConta} disabled={saindo} style={estilos.botaoSair}><Ionicons name="log-out-outline" size={19} color={cores.vermelho} /><Text style={estilos.textoSair}>{saindo ? 'Saindo...' : 'Sair da conta'}</Text></Pressable>
       <View style={estilos.rodape}><MaterialCommunityIcons name="map-marker-check" size={16} color={cores.primario} /><Text style={estilos.textoRodape}>Lembriê · versão 1.0</Text></View>

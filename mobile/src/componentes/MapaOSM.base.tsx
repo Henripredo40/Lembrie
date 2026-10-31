@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { Animated, Image, PanResponder, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import estilos from '../estilos/MapaOSM.estilos';
 
@@ -35,8 +35,23 @@ type Props = {
 
 export default function MapaOSMBase({ latitude, longitude, onChoose }: Props) {
   const [dimensões, definirDimensões] = useState({ width: 360, height: 265 });
+  const deslocamento = useRef(new Animated.ValueXY()).current;
   const centroX = pixelX(longitude);
   const centroY = pixelY(latitude);
+  const centroAtual = useRef({ x: centroX, y: centroY });
+  const escolherAtual = useRef(onChoose);
+  centroAtual.current = { x: centroX, y: centroY };
+  escolherAtual.current = onChoose;
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesto) => Math.abs(gesto.dx) + Math.abs(gesto.dy) > 7,
+    onPanResponderMove: Animated.event([null, { dx: deslocamento.x, dy: deslocamento.y }], { useNativeDriver: false }),
+    onPanResponderRelease: (_event, gesto) => {
+      const ponto = coordenadas(centroAtual.current.x - gesto.dx, centroAtual.current.y - gesto.dy);
+      deslocamento.setValue({ x: 0, y: 0 });
+      escolherAtual.current(ponto.latitude, ponto.longitude);
+    },
+    onPanResponderTerminate: () => deslocamento.setValue({ x: 0, y: 0 }),
+  }), [deslocamento]);
   const tiles = useMemo(() => {
     const colunaInicial = Math.floor((centroX - dimensões.width / 2) / TILE);
     const colunaFinal = Math.floor((centroX + dimensões.width / 2 - 0.001) / TILE);
@@ -66,19 +81,22 @@ export default function MapaOSMBase({ latitude, longitude, onChoose }: Props) {
   return (
     <View
       style={estilos.mapa}
+      {...panResponder.panHandlers}
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;
         if (width && height) definirDimensões({ width, height });
       }}
     >
-      {tiles.map(tile => (
-        <Image
-          key={tile.chave}
-          source={{ uri: tile.uri, headers: { 'User-Agent': 'Lembriê/1.0 (mapa de planejamento)' } }}
-          style={[estilos.tile, { left: tile.left, top: tile.top }]}
-          resizeMode="stretch"
-        />
-      ))}
+      <Animated.View pointerEvents="none" style={[estilos.camadaMapa, { transform: deslocamento.getTranslateTransform() }]}>
+        {tiles.map(tile => (
+          <Image
+            key={tile.chave}
+            source={{ uri: tile.uri, headers: { 'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)' } }}
+            style={[estilos.tile, { left: tile.left, top: tile.top }]}
+            resizeMode="stretch"
+          />
+        ))}
+      </Animated.View>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Marcar este ponto no mapa"
@@ -93,7 +111,7 @@ export default function MapaOSMBase({ latitude, longitude, onChoose }: Props) {
       <View pointerEvents="none" style={estilos.marcadorMapa}>
         <Ionicons name="location" size={34} color="#D92D20" />
       </View>
-      <View pointerEvents="none" style={estilos.dicaMapa}><Text style={estilos.textoDicaMapa}>Toque no mapa para escolher o ponto</Text></View>
+      <View pointerEvents="none" style={estilos.dicaMapa}><Text style={estilos.textoDicaMapa}>Arraste para mover o mapa ou toque no endereço</Text></View>
     </View>
   );
 }

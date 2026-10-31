@@ -57,6 +57,7 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
         id: objeto.id,
         name: objeto.name,
         category: objeto.category,
+        image_data: objeto.image_data,
         essential: objetoÉEssencial(objeto),
         sugestao: false,
         conferido: false,
@@ -176,7 +177,7 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
       <Text style={estilos.sobretitulo}>ROTINA</Text>
       <Text style={estilos.titulo}>Antes de sair</Text>
-      <Text style={estilos.subtitulo}>Monte uma lista prática e marque o que já pegou. A conferência é manual enquanto o chaveiro físico não estiver pronto.</Text>
+      <Text style={estilos.subtitulo}>Monte sua lista e marque os itens conferidos. A detecção por proximidade e os alertas dependem de um chaveiro Bluetooth compatível associado.</Text>
 
       <View style={estilos.cartaoDestino}>
         <View style={estilos.iconeDestino}><Ionicons name="navigate-outline" size={20} color={cores.primario} /></View>
@@ -232,7 +233,7 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
               {resultadoSaida.checked?.length ? <Text style={estilos.textoResultado}>Marcados por você como conferidos: {resultadoSaida.checked.join(', ')}. Essa confirmação é manual.</Text> : null}
               {resultadoSaida.detected?.length ? <Text style={estilos.textoResultado}>Bluetooth detectou: {resultadoSaida.detected.join(', ')}.</Text> : null}
               {resultadoSaida.missing?.length ? <Text style={estilos.textoAlertaResultado}>Sem sinal do chaveiro: {resultadoSaida.missing.join(', ')}. Confira esses itens manualmente; o sinal sozinho não confirma que foram esquecidos.</Text> : null}
-              {resultadoSaida.withoutKeychain?.length ? <Text style={estilos.textoResultado}>Ainda sem chaveiro associado: {resultadoSaida.withoutKeychain.join(', ')}.</Text> : null}
+              {resultadoSaida.withoutKeychain?.length ? <Text style={estilos.textoResultado}>Para acompanhar objetos por Bluetooth, associe um chaveiro compatível.</Text> : null}
               {resultadoSaida.expected?.length ? <Text style={estilos.textoResultado}>Sugestões para esse destino: {resultadoSaida.expected.join(', ')}.</Text> : null}
             </View>
           ) : null}
@@ -244,7 +245,7 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
         <View style={estilos.cartaoOrientacao}>
           <View style={estilos.iconeOrientacao}><Ionicons name="hand-left-outline" size={22} color={cores.primario} /></View>
           <Text style={estilos.tituloOrientacao}>Uma conferência simples e confiável</Text>
-          <Text style={estilos.textoOrientacao}>O aplicativo não vai afirmar que um objeto está perdido sem receber sinal do chaveiro. Por enquanto, você marca cada item ao colocá-lo na bolsa ou no bolso.</Text>
+          <Text style={estilos.textoOrientacao}>A lista e a conferência manual funcionam sem chaveiro. A detecção de proximidade e os alertas de separação exigem um chaveiro Bluetooth compatível, ligado e associado.</Text>
         </View>
       )}
       <View style={{ height: 24 }} />

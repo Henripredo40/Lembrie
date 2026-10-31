@@ -91,7 +91,7 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
           accessibilityLabel="Buscar objeto"
           value={busca}
           onChangeText={definirBusca}
-          placeholder="Buscar um objeto..."
+          placeholder="Buscar por nome ou categoria"
           placeholderTextColor={cores.textoSuave}
           returnKeyType="search"
           style={estilos.campoBusca}
@@ -99,16 +99,24 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
         {busca ? <Pressable accessibilityRole="button" accessibilityLabel="Limpar busca" onPress={() => definirBusca('')} hitSlop={8}><Ionicons name="close-circle" size={20} color="#98A2B3" /></Pressable> : null}
       </View>
 
+      {busca.trim() ? (
+        <View style={estilos.resultadosBusca}>
+          <TituloSecao título={'RESULTADOS · ' + objetosEncontrados.length} />
+          {objetosEncontrados.length ? <View style={estilos.listaObjetos}>{objetosEncontrados.map((objeto) => <CartaoObjeto key={String(objeto.id)} objeto={objeto} compacto />)}</View> : <EstadoVazio ícone="search-outline" título="Nenhum objeto encontrado" texto="Confira a escrita ou tente buscar pela categoria." />}
+        </View>
+      ) : (
+        <>
+
       <View style={estilos.cartaoChaveiro}>
         <View style={estilos.linhaChaveiro}>
           <View style={estilos.iconeChaveiro}><MaterialCommunityIcons name="bluetooth" size={24} color={cores.branco} /></View>
           <View style={estilos.infoChaveiro}>
             <Text style={estilos.rotuloChaveiro}>SEU CHAVEIRO</Text>
             <Text style={estilos.tituloChaveiro}>
-              {detectados > 0 ? detectados + (detectados === 1 ? ' dispositivo detectado' : ' dispositivos detectados') : vinculados > 0 ? 'Aguardando o primeiro sinal' : 'Pronto para o seu projeto'}
+              {detectados > 0 ? detectados + (detectados === 1 ? ' dispositivo detectado' : ' dispositivos detectados') : vinculados > 0 ? 'Aguardando o primeiro sinal' : 'Chaveiro não associado'}
             </Text>
             <Text style={estilos.textoChaveiro}>
-              {detectados > 0 ? 'O aplicativo recebeu um sinal do chaveiro.' : vinculados > 0 ? 'O dispositivo está associado, mas ainda não enviou sinal.' : 'Cadastre seus itens agora e associe o chaveiro quando ele estiver pronto.'}
+              {detectados > 0 ? 'O aplicativo recebeu um sinal do chaveiro.' : vinculados > 0 ? 'O dispositivo está associado, mas ainda não enviou sinal.' : 'A detecção por proximidade e os alertas Bluetooth exigem um chaveiro compatível associado ao objeto.'}
             </Text>
           </View>
         </View>
@@ -131,7 +139,7 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
           const quantidade = objetos.filter((objeto) => normalizarTexto(objeto.category) === normalizarTexto(categoria.nome)).length;
           return (
             <Pressable key={categoria.nome} accessibilityRole="button" onPress={() => abrirTela('objetos', { categoria: categoria.nome })} style={estilos.categoria}>
-              <View style={estilos.iconeCategoria}>{categoria.objetoRepresentativo ? <ImagemObjeto nome={categoria.objetoRepresentativo.name} categoria={categoria.objetoRepresentativo.category} tamanho={12} compacto /> : <MaterialCommunityIcons name={categoria.ícone} size={20} color={cores.primario} />}</View>
+              <View style={estilos.iconeCategoria}>{categoria.objetoRepresentativo ? <ImagemObjeto nome={categoria.objetoRepresentativo.name} categoria={categoria.objetoRepresentativo.category} imagemUri={categoria.objetoRepresentativo.image_data} tamanho={12} compacto /> : <MaterialCommunityIcons name={categoria.ícone} size={20} color={cores.primario} />}</View>
               <Text style={estilos.nomeCategoria}>{categoria.nome}</Text>
               <Text style={estilos.quantidadeCategoria}>{quantidade} {quantidade === 1 ? 'item' : 'itens'}</Text>
               {categoria.rotina ? <Text style={estilos.rotuloRotinaCategoria}>Para sua rotina</Text> : null}
@@ -141,18 +149,18 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
       </View>
       {categoriasVisiveis.length === 0 ? <Text style={estilos.semCategorias}>Cadastre um objeto para ver suas categorias.</Text> : null}
 
-      <TituloSecao título={busca ? 'RESULTADOS' : 'SEUS OBJETOS'} ação={objetos.length ? 'Ver todos' : undefined} aoPressionar={() => abrirTela('objetos')} />
-      {objetosEncontrados.length === 0 ? (
+      <TituloSecao título="SEUS OBJETOS" ação={objetos.length ? 'Ver todos' : undefined} aoPressionar={() => abrirTela('objetos')} />
+      {objetos.length === 0 ? (
         <EstadoVazio
-          ícone={busca ? 'search-outline' : 'cube-outline'}
-          título={busca ? 'Nenhum objeto encontrado' : 'Sua lista começa aqui'}
-          texto={busca ? 'Tente outro nome ou categoria.' : 'Cadastre suas chaves, mochila, carteira e outros itens importantes.'}
-          ação={busca ? undefined : 'Cadastrar primeiro objeto'}
+          ícone="cube-outline"
+          título="Sua lista começa aqui"
+          texto="Cadastre suas chaves, mochila, carteira e outros itens importantes."
+          ação="Cadastrar primeiro objeto"
           aoPressionar={() => abrirTela('objetos')}
         />
       ) : (
         <View style={estilos.listaObjetos}>
-          {objetosEncontrados.slice(0, 4).map((objeto) => <CartaoObjeto key={String(objeto.id)} objeto={objeto} compacto />)}
+          {objetos.slice(0, 4).map((objeto) => <CartaoObjeto key={String(objeto.id)} objeto={objeto} compacto />)}
         </View>
       )}
 
@@ -162,7 +170,7 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
       </View>
 
       {mostrarAlertas && essenciais > 0 && vinculados === 0 ? (
-        <Aviso ícone="information-circle-outline" texto="Você marcou itens essenciais, mas ainda não associou um chaveiro Bluetooth. Até o chaveiro ficar pronto, confira os itens manualmente antes de sair." />
+        <Aviso ícone="information-circle-outline" texto="A conferência manual está disponível. Para detecção por proximidade e alertas Bluetooth, associe um chaveiro compatível ao objeto." />
       ) : null}
 
       <TituloSecao título="ATIVIDADE RECENTE" ação={eventos.length ? 'Ver histórico' : undefined} aoPressionar={() => abrirTela('historico')} />
@@ -179,6 +187,8 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
         <Text style={estilos.semAtividade}>As atividades e conferências aparecerão aqui.</Text>
       )}
       <View style={{ height: 24 }} />
+        </>
+      )}
     </ScrollView>
   );
 }

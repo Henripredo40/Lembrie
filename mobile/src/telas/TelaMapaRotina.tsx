@@ -63,7 +63,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       const endereço = [dados.logradouro, dados.bairro, dados.cidade, dados.uf, 'Brasil'].filter(Boolean).join(', ');
       if (!endereço) throw new Error('O CEP foi encontrado, mas não retornou um endereço para pesquisar.');
       let encontrados = await api('/places/search?q=' + encodeURIComponent(endereço));
-      let aproximado = false;
+      let aproximado = true;
       if (!Array.isArray(encontrados) || !encontrados.length) {
         try {
           encontrados = await api('/places/postal-code?cep=' + cep);
@@ -79,8 +79,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
         ? encontrados.map(local => ({ ...local, cep: dados.cep, bairro: local.bairro || dados.bairro, logradouro: local.logradouro || dados.logradouro, cidade: local.cidade || dados.cidade, uf: local.uf || dados.uf, aproximado }))
         : [];
       definirLocais(resultados);
-      if (aproximado) definirErro(`Não encontrei o ponto exato do CEP ${dados.cep}. Mostrei uma referência da cidade; toque no mapa para marcar o endereço correto.`);
-      else if (!resultados.length) definirErro(`Encontrei o endereço do CEP ${dados.cep}, mas não consegui posicioná-lo no mapa. Pesquise o logradouro pelo nome.`);
+      if (!resultados.length) definirErro(`Encontrei o CEP ${dados.cep}, mas não consegui posicionar esse endereço no mapa. Pesquise o logradouro pelo nome e número.`);
     } catch (falha) {
       definirErro(falha.message || 'Não foi possível consultar esse CEP.');
     } finally {
@@ -237,7 +236,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
       <Text style={estilos.sobretitulo}>PLANEJAMENTO</Text>
       <Text style={estilos.titulo}>Mapa e rotina</Text>
-      <Text style={estilos.subtitulo}>Pesquise por endereço ou CEP, escolha um resultado e veja o que levar. Você também pode tocar no mapa para marcar um ponto.</Text>
+      <Text style={estilos.subtitulo}>Pesquise pelo endereço completo com número ou use o CEP como referência. Arraste o mapa para ajustar o pino ao local exato.</Text>
       <View style={estilos.modosBusca}>
         <Pressable accessibilityRole="button" accessibilityState={{ selected: modoBusca === 'endereco' }} onPress={() => { definirModoBusca('endereco'); definirLocais([]); definirErro(''); }} style={[estilos.modoBusca, modoBusca === 'endereco' && estilos.modoBuscaAtivo]}><Text style={[estilos.textoModoBusca, modoBusca === 'endereco' && estilos.textoModoBuscaAtivo]}>Endereço ou lugar</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityState={{ selected: modoBusca === 'cep' }} onPress={() => { definirModoBusca('cep'); definirLocais([]); definirErro(''); }} style={[estilos.modoBusca, modoBusca === 'cep' && estilos.modoBuscaAtivo]}><Text style={[estilos.textoModoBusca, modoBusca === 'cep' && estilos.textoModoBuscaAtivo]}>Buscar por CEP</Text></Pressable>
@@ -245,7 +244,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       <View style={estilos.busca}>
         {modoBusca === 'cep'
           ? <View style={estilos.campoBusca}><CampoTexto rótulo="CEP" value={cepBusca} onChangeText={valor => definirCepBusca(valor.replace(/\D/g, '').slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2'))} placeholder="Ex.: 01001-000" keyboardType="number-pad" returnKeyType="search" onSubmitEditing={buscarPorCep} maxLength={9} /></View>
-          : <View style={estilos.campoBusca}><CampoTexto rótulo="NOME DO LUGAR OU ENDEREÇO" value={consulta} onChangeText={definirConsulta} placeholder="Ex.: Av. Paulista, 1000, São Paulo" returnKeyType="search" onSubmitEditing={buscarLocal} maxLength={120} /></View>}
+          : <View style={estilos.campoBusca}><CampoTexto rótulo="NOME DO LUGAR OU ENDEREÇO" value={consulta} onChangeText={definirConsulta} placeholder="Ex.: SQN 308, Brasília, DF" returnKeyType="search" onSubmitEditing={buscarLocal} maxLength={120} /></View>}
         <Pressable accessibilityRole="button" accessibilityLabel={modoBusca === 'cep' ? 'Buscar CEP' : 'Buscar lugar ou endereço'} onPress={modoBusca === 'cep' ? buscarPorCep : buscarLocal} disabled={buscando} style={estilos.botaoBusca}>{buscando ? <ActivityIndicator size="small" color={cores.branco} /> : <Ionicons name="search" size={19} color={cores.branco} />}</Pressable>
       </View>
       {buscando ? <View style={estilos.resultados}><ActivityIndicator size="small" color={cores.primario} /><Text style={estilos.endereçoResultado}>Buscando lugares e endereços…</Text></View> : null}
@@ -256,13 +255,13 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       <Pressable accessibilityRole="button" onPress={localizarAgora} style={estilos.botaoLocalização}><Ionicons name="locate-outline" size={17} color={cores.primario} /><Text style={estilos.textoLocalização}>Mostrar minha localização agora</Text></Pressable>
       {erro ? <Aviso ícone="alert-circle-outline" tom="alerta" texto={erro} /> : null}
       <MapaOSM
-        latitude={selecionado?.latitude ?? -23.5505}
-        longitude={selecionado?.longitude ?? -46.6333}
+        latitude={selecionado?.latitude ?? -15.7939}
+        longitude={selecionado?.longitude ?? -47.8828}
         onChoose={escolherPontoNoMapa}
       />
       <Text style={estilos.atribuição}>Mapa © OpenStreetMap contributors</Text>
       {selecionado ? <>
-        <View style={estilos.localSelecionado}><Ionicons name="location" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{selecionado.nome}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{selecionado.endereço}</Text>{selecionado.aproximado ? <Text style={estilos.endereçoResultado}>Referência aproximada: toque no mapa para marcar o endereço exato.</Text> : null}{selecionado.cep ? <Text style={estilos.textoCep}>CEP {selecionado.cep}</Text> : null}</View></View>
+        <View style={estilos.localSelecionado}><Ionicons name="location" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{selecionado.nome}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{selecionado.endereço}</Text>{selecionado.aproximado ? <Text style={estilos.endereçoResultado}>O CEP indica uma referência da rua/região. Para chegar ao número certo, arraste o mapa até o ponto desejado.</Text> : null}{selecionado.cep ? <Text style={estilos.textoCep}>CEP {selecionado.cep}</Text> : null}</View></View>
         {cepsDoEndereco.length > 1 ? <View style={estilos.cepsEncontrados}><Text style={estilos.endereçoResultado}>Mais de um CEP encontrado para este logradouro. Confira o bairro para escolher:</Text>{cepsDoEndereco.map(opção => <Pressable key={opção.cep} onPress={() => definirSelecionado(atual => ({ ...atual, cep: opção.cep, bairro: opção.bairro }))} style={[estilos.opcaoCep, selecionado.cep === opção.cep && estilos.opcaoCepAtiva]}><Text style={[estilos.textoOpcaoCep, selecionado.cep === opção.cep && estilos.textoOpcaoCepAtivo]}>{opção.cep}{opção.bairro ? ` · ${opção.bairro}` : ''}</Text></Pressable>)}</View> : null}
         <View style={estilos.cartaoSugestões}>
           {objetosCadastrados.length ? <>
@@ -271,7 +270,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
             <View style={estilos.listaObjetos}>{objetosCadastrados.map(item => {
               const recomendado = objetosSugeridos.some(objeto => String(objeto.id) === String(item.id));
               const marcado = objetosSelecionados.includes(String(item.id));
-              return <Pressable key={String(item.id)} accessibilityRole="checkbox" accessibilityState={{ checked: marcado }} onPress={() => alternarObjetoSelecionado(item.id)} style={[estilos.linhaObjeto, marcado && estilos.linhaObjetoSelecionado]}><View style={[estilos.marcadorObjeto, marcado && estilos.marcadorObjetoAtivo]}>{marcado ? <Ionicons name="checkmark" size={15} color={cores.branco} /> : null}</View><ImagemObjeto nome={item.name} categoria={item.category} tamanho={22} compacto /><View style={{ flex: 1 }}><Text style={estilos.textoSugestão}>{item.name}</Text><Text style={estilos.endereçoResultado}>{recomendado ? 'Recomendado para este destino' : item.category || 'Objeto'}</Text></View>{item.essential ? <Ionicons name="star" size={16} color="#C77A19" /> : null}</Pressable>;
+              return <Pressable key={String(item.id)} accessibilityRole="checkbox" accessibilityState={{ checked: marcado }} onPress={() => alternarObjetoSelecionado(item.id)} style={[estilos.linhaObjeto, marcado && estilos.linhaObjetoSelecionado]}><View style={[estilos.marcadorObjeto, marcado && estilos.marcadorObjetoAtivo]}>{marcado ? <Ionicons name="checkmark" size={15} color={cores.branco} /> : null}</View><ImagemObjeto nome={item.name} categoria={item.category} imagemUri={item.image_data} tamanho={22} compacto /><View style={{ flex: 1 }}><Text style={estilos.textoSugestão}>{item.name}</Text><Text style={estilos.endereçoResultado}>{recomendado ? 'Recomendado para este destino' : item.category || 'Objeto'}</Text></View>{item.essential ? <Ionicons name="star" size={16} color="#C77A19" /> : null}</Pressable>;
             })}</View>
           </> : <>
             <TituloSecao título="SEUS OBJETOS PARA LEVAR" />

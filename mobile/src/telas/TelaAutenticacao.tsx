@@ -30,6 +30,11 @@ export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, re
   async function enviarRecuperacao() {
     definirErro('');
     definirAviso('');
+    if (codigoEnviado) {
+      if (!/^\d{6}$/.test(codigo)) return definirErro('Digite o código de 6 dígitos recebido por e-mail.');
+      if (novaSenha.length < 6) return definirErro('A nova senha precisa ter pelo menos 6 caracteres.');
+      if (novaSenha !== confirmarNovaSenha) return definirErro('As senhas não são iguais.');
+    }
     const resultado = await recuperarSenha(codigoEnviado ? { email, codigo, senha: novaSenha } : { email });
     if (resultado?.erro) return definirErro(resultado.erro);
     if (codigoEnviado) {
@@ -42,6 +47,9 @@ export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, re
       return definirAviso('Senha alterada. Entre com sua nova senha.');
     }
     definirCodigoEnviado(true);
+    definirCodigo('');
+    definirNovaSenha('');
+    definirConfirmarNovaSenha('');
     definirAviso(resultado?.mensagem || 'Confira seu e-mail para obter o código.');
   }
 
@@ -75,7 +83,7 @@ export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, re
           <View style={estilos.iconeMarca}><MaterialCommunityIcons name="map-marker-check" size={36} color={cores.branco} /></View>
           <Text style={estilos.nomeMarca}>LEMBRIÊ</Text>
           <Text style={estilos.titulo}>Seus itens importantes,{ '\n' }sempre por perto.</Text>
-          <Text style={estilos.subtitulo}>Organize seus objetos, planeje saídas e prepare o acompanhamento pelo chaveiro Bluetooth.</Text>
+          <Text style={estilos.subtitulo}>Organize seus objetos e planeje saídas. Associe um chaveiro Bluetooth compatível para ativar a detecção por proximidade.</Text>
         </View>
 
         <View style={estilos.cartao}>
@@ -86,6 +94,7 @@ export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, re
             {codigoEnviado ? <>
               <CampoTexto rótulo="Código de 6 dígitos" value={codigo} onChangeText={valor => definirCodigo(valor.replace(/\D/g, '').slice(0, 6))} placeholder="000000" keyboardType="number-pad" maxLength={6} />
               <CampoTexto rótulo="Nova senha" value={novaSenha} onChangeText={definirNovaSenha} placeholder="Pelo menos 6 caracteres" secureTextEntry={!senhaVisivel} autoCapitalize="none" />
+              <CampoTexto rótulo="Confirmar nova senha" value={confirmarNovaSenha} onChangeText={definirConfirmarNovaSenha} placeholder="Digite a senha novamente" secureTextEntry={!senhaVisivel} autoCapitalize="none" />
               <Pressable accessibilityRole="button" onPress={() => definirSenhaVisivel(valor => !valor)} style={estilos.botaoSenha}><Ionicons name={senhaVisivel ? 'eye-off-outline' : 'eye-outline'} size={16} color={cores.primario} /><Text style={estilos.textoBotaoSenha}>{senhaVisivel ? 'Ocultar senha' : 'Mostrar senha'}</Text></Pressable>
             </> : null}
             {!codigoEnviado && !tokenGoogle ? <>
@@ -110,7 +119,7 @@ export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, re
             {erro ? <View accessibilityRole="alert" style={estilos.caixaErro}><Text style={estilos.textoErro}>{erro}</Text></View> : null}
             {aviso ? <View style={estilos.caixaAviso}><Text style={estilos.textoAviso}>{aviso}</Text></View> : null}
             {!tokenGoogle ? <Botao título={carregando ? 'Aguarde...' : codigoEnviado ? 'Redefinir senha' : 'Enviar código'} aoPressionar={enviarRecuperacao} carregando={carregando} ícone="mail-outline" /> : null}
-            {codigoEnviado ? <Pressable accessibilityRole="button" onPress={() => { definirCodigoEnviado(false); definirAviso(''); definirErro(''); }} style={estilos.linkSecundario}><Text style={estilos.textoLink}>Enviar outro código</Text></Pressable> : null}
+            {codigoEnviado ? <Pressable accessibilityRole="button" onPress={() => { definirCodigoEnviado(false); definirCodigo(''); definirNovaSenha(''); definirConfirmarNovaSenha(''); definirAviso('Aguarde pelo menos 1 minuto entre solicitações de código.'); definirErro(''); }} style={estilos.linkSecundario}><Text style={estilos.textoLink}>Solicitar outro código</Text></Pressable> : null}
             <Pressable accessibilityRole="button" onPress={voltarAcesso} style={estilos.linkSecundario}><Text style={estilos.textoLink}>Voltar para entrar</Text></Pressable>
           </> : <>
             <View style={estilos.abas}>

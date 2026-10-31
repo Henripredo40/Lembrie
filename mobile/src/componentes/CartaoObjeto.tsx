@@ -12,7 +12,7 @@ export default function CartaoObjeto({ objeto, aoEditar, aoRemover, compacto = f
 
   return (
     <View style={[estilos.cartao, compacto && estilos.cartaoCompacto]}>
-      <ImagemObjeto nome={objeto.name} categoria={objeto.category} tamanho={compacto ? 24 : 29} compacto={compacto} />
+      <ImagemObjeto nome={objeto.name} categoria={objeto.category} imagemUri={objeto.image_data} tamanho={compacto ? 24 : 29} compacto={compacto} />
       <View style={estilos.conteudo}>
         <View style={estilos.linhaTitulo}>
           <Text style={estilos.nome} numberOfLines={1}>{objeto.name}</Text>
@@ -22,7 +22,7 @@ export default function CartaoObjeto({ objeto, aoEditar, aoRemover, compacto = f
         <View style={estilos.linhaEstado}>
           <View style={[estilos.ponto, detectado ? estilos.pontoDetectado : vinculado ? estilos.pontoAguardando : estilos.pontoNeutro]} />
           <Text style={[estilos.estado, detectado ? estilos.estadoDetectado : vinculado ? estilos.estadoAguardando : estilos.estadoNeutro]} numberOfLines={1}>
-            {detectado ? 'Chaveiro detectado' : vinculado ? 'Chaveiro associado · aguardando sinal' : 'Sem chaveiro associado'}
+            {detectado ? 'Chaveiro detectado' : vinculado ? 'Chaveiro associado · sem sinal' : 'Sem dispositivo Bluetooth associado'}
           </Text>
         </View>
       </View>

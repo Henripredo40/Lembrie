@@ -268,7 +268,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo}>
       <Text style={estilos.sobretitulo}>CHAVEIRO</Text>
       <Text style={estilos.titulo}>Bluetooth</Text>
-      <Text style={estilos.subtitulo}>Prepare a associação dos seus objetos ao chaveiro que você vai construir.</Text>
+      <Text style={estilos.subtitulo}>Associe um chaveiro Bluetooth compatível para habilitar a detecção por proximidade e os alertas de separação.</Text>
 
       {Platform.OS === 'web' ? (
         <EstadoVazio ícone="phone-portrait-outline" título="Use o aplicativo Android para buscar" texto="A busca Bluetooth precisa das permissões nativas do celular. No site, você pode organizar os objetos; para encontrar dispositivos, use o APK Android." />
@@ -285,7 +285,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
 
           <View style={estilos.cartaoAviso}>
             <View style={estilos.cabecalhoAviso}><Ionicons name="construct-outline" size={19} color={cores.primario} /><Text style={estilos.tituloAviso}>Como conectar</Text></View>
-            <Text style={estilos.textoAviso}>Ligue a placa no interruptor físico e mantenha o chaveiro perto do celular. Escolha o objeto, toque em “Buscar meu chaveiro” e conecte ao dispositivo encontrado. A placa precisa estar ligada para o app encontrá-la.</Text>
+            <Text style={estilos.textoAviso}>Sem chaveiro, você ainda pode organizar objetos e conferir sua lista manualmente. Para usar o acompanhamento por Bluetooth, é necessário um chaveiro compatível, ligado e associado ao objeto.</Text>
           </View>
 
           {objetos.length ? (
@@ -363,7 +363,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
               ))}
             </View>
           ) : (
-            <Text style={estilos.nenhumAssociado}>Ainda não há dispositivos associados. Você pode fazer isso quando o chaveiro estiver pronto.</Text>
+            <Text style={estilos.nenhumAssociado}>Para habilitar a detecção por proximidade, associe um chaveiro Bluetooth compatível. A lista de objetos continua disponível sem ele.</Text>
           )}
         </>
       )}

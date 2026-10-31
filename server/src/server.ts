@@ -29,7 +29,7 @@ app.use(cors({
     callback(null, origemLocal || origensPermitidas.has(origem));
   }
 }));
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 const diretorioWeb = path.resolve(__dirname, '../public');
 app.use(express.static(diretorioWeb, { index: false }));
 
@@ -107,6 +107,7 @@ async function init() {
   await ensureColumn('settings', 'preventive_alerts', 'BOOLEAN DEFAULT TRUE');
   await ensureColumn('settings', 'essential_only', 'BOOLEAN DEFAULT FALSE');
   await ensureColumn('settings', 'routine_consent_at', 'DATETIME NULL');
+  await ensureColumn('objects', 'image_data', 'LONGTEXT NULL');
   await db.execute('UPDATE settings SET routine_enabled=FALSE,routine_consent_at=NOW() WHERE routine_consent_at IS NULL');
 
   await db.execute(`
@@ -649,11 +650,15 @@ app.post('/objects', auth, async (q, r) => {
       name,
       category,
       important,
+      image_data,
       ble_uuid,
       uuid
     } = q.body;
     const isImportant = q.body.important ?? q.body.essential;
     const deviceUuid = ble_uuid || uuid;
+    if (image_data != null && (typeof image_data !== 'string' || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image_data) || image_data.length > 650000)) {
+      return r.status(400).json({ error: 'A foto precisa ser JPEG, PNG ou WebP e ter no máximo 450 KB.' });
+    }
 
     if (!name?.trim()) {
       return r.status(400).json({
@@ -667,15 +672,17 @@ app.post('/objects', auth, async (q, r) => {
         user_id,
         name,
         category,
-        important
+        important,
+        image_data
       )
-      VALUES(?,?,?,?)
+      VALUES(?,?,?,?,?)
       `,
       [
         q.user.id,
         name.trim(),
         category || 'Outros',
-        !!isImportant
+        !!isImportant,
+        image_data || null
       ]
     );
 
@@ -703,6 +710,7 @@ app.post('/objects', auth, async (q, r) => {
       category: category || 'Outros',
       important: !!isImportant,
       essential: !!isImportant,
+      image_data: image_data || null,
       ble_uuid: deviceUuid?.trim() || null,
       connected: false
     });
@@ -722,12 +730,17 @@ app.patch('/objects/:id', auth, async (q, r) => {
   const nome = q.body.name;
   const categoria = q.body.category;
   const essencial = q.body.important ?? q.body.essential;
+  const informarImagem = Object.prototype.hasOwnProperty.call(q.body, 'image_data');
+  const imageData = q.body.image_data;
   const uuidBruto = informarChaveiro ? q.body.ble_uuid : undefined;
   const uuid = uuidBruto == null || String(uuidBruto).trim() === ''
     ? null
     : String(uuidBruto).trim();
 
   try {
+    if (informarImagem && imageData != null && (typeof imageData !== 'string' || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(imageData) || imageData.length > 650000)) {
+      return r.status(400).json({ error: 'A foto precisa ser JPEG, PNG ou WebP e ter no máximo 450 KB.' });
+    }
     await conexao.beginTransaction();
 
     const [objeto] = await conexao.execute(
@@ -746,13 +759,16 @@ app.patch('/objects/:id', auth, async (q, r) => {
       SET
         name=COALESCE(?,name),
         category=COALESCE(?,category),
-        important=COALESCE(?,important)
+        important=COALESCE(?,important),
+        image_data=IF(?, ?, image_data)
       WHERE id=? AND user_id=?
       `,
       [
         nome?.trim() || null,
         categoria?.trim() || null,
         essencial === undefined ? null : !!essencial,
+        informarImagem,
+        imageData || null,
         q.params.id,
         q.user.id
       ]
@@ -1166,6 +1182,7 @@ function registeredSuggestions(destination, objects) {
       name: object.name,
       category: object.category || 'Outros',
       essential: Boolean(object.important),
+      image_data: object.image_data || null,
     }));
 }
 
@@ -1416,6 +1433,7 @@ app.get('/recommendations', auth, async (q, r) => {
       name: object.name,
       category: object.category || 'Outros',
       essential: Boolean(object.important),
+      image_data: object.image_data || null,
     }))
   });
 });
@@ -1491,11 +1509,19 @@ app.get('/places/search', auth, async (q, r) => {
       if (wait) await new Promise(resolve => setTimeout(resolve, wait));
       ultimoPedidoDeMapa = Date.now();
       const url = new URL('https://nominatim.openstreetmap.org/search');
-      url.search = new URLSearchParams({ q: query, format: 'jsonv2', limit: '5', addressdetails: '1' }).toString();
+      url.search = new URLSearchParams({
+        q: query,
+        countrycodes: 'br',
+        viewbox: '-48.50,-15.35,-47.25,-16.20',
+        format: 'jsonv2',
+        limit: '5',
+        addressdetails: '1'
+      }).toString();
       const response = await fetch(url, {
         headers: {
           'Accept-Language': 'pt-BR,pt;q=0.9',
-          'User-Agent': `Lembriê/1.0 (busca de locais; contato: ${process.env.RESEND_FROM || process.env.SMTP_FROM || 'contato do aplicativo'})`
+          'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)',
+          'Referer': 'https://lembre-web.onrender.com/'
         },
         signal: AbortSignal.timeout(12000)
       });
@@ -1528,7 +1554,8 @@ app.get('/places/postal-code', auth, async (q, r) => {
       const response = await fetch(url, {
         headers: {
           'Accept-Language': 'pt-BR,pt;q=0.9',
-          'User-Agent': `Lembriê/1.0 (busca de locais; contato: ${process.env.RESEND_FROM || process.env.SMTP_FROM || 'contato do aplicativo'})`
+          'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)',
+          'Referer': 'https://lembre-web.onrender.com/'
         },
         signal: AbortSignal.timeout(12000)
       });
@@ -1564,7 +1591,8 @@ app.get('/places/reverse', auth, async (q, r) => {
       const response = await fetch(url, {
         headers: {
           'Accept-Language': 'pt-BR,pt;q=0.9',
-          'User-Agent': `Lembriê/1.0 (busca de locais; contato: ${process.env.RESEND_FROM || process.env.SMTP_FROM || 'contato do aplicativo'})`
+          'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)',
+          'Referer': 'https://lembre-web.onrender.com/'
         },
         signal: AbortSignal.timeout(12000)
       });

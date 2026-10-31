@@ -35,6 +35,7 @@ const estilos = StyleSheet.create({
   rotuloRotinaCategoria: { color: cores.primario, fontSize: 10, fontWeight: '800', marginTop: 4 },
   semCategorias: { color: cores.textoSuave, fontSize: 13, lineHeight: 19, padding: 15, borderRadius: 16, backgroundColor: cores.branco, borderWidth: 1, borderColor: cores.linha },
   listaObjetos: { gap: 9 },
+  resultadosBusca: { gap: 10, paddingTop: 8, paddingBottom: 24 },
   atalhos: { flexDirection: 'row', gap: 10, marginTop: 17 },
   atalho: { flex: 1, minHeight: 126, padding: 16, borderRadius: 20, backgroundColor: cores.branco, borderWidth: 1, borderColor: cores.linha },
   iconeAtalho: { width: 35, height: 35, borderRadius: 12, backgroundColor: cores.primarioClaro, alignItems: 'center', justifyContent: 'center', marginBottom: 9 },
