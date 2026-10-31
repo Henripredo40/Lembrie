@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Lembriê",
+    "slug": "chaveiro-antiperda",
+    "scheme": "lembre",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/lembre-icon.png",
+    "web": {
+      "output": "single"
+    },
+    "android": {
+      "package": "com.chaveiroantiperda.app",
+      "permissions": [
+        "BLUETOOTH_SCAN",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.chaveiroantiperda.app",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Usamos Bluetooth para detectar os chaveiros.",
+        "NSLocationWhenInUseUsageDescription": "Sua localização atual é usada apenas quando você pede para mostrá-la no mapa."
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c71d2ed3-e50a-422f-ab30-4fd995be84b6"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permita o uso da localização enquanto utiliza o app para mostrar sua posição no mapa."
+        }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "bluetoothAlwaysPermission": "O Lembriê usa Bluetooth para localizar dispositivos associados aos seus objetos."
+        }
+      ],
+      "expo-asset",
+      "expo-web-browser"
+    ]
+  }
+}

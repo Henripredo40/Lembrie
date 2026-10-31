@@ -1,0 +1,13 @@
+node_modules/
+**/node_modules/
+**/.env
+**/.env.*
+!**/.env.example
+mobile/.expo/
+mobile/dist/
+mobile/.git/
+server/dist/
+*.log
+*.zip
+!server/.env.migrate.example
+mobile/.git-mobile-backup/
