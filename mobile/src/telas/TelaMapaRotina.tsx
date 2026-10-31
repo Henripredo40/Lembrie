@@ -95,7 +95,6 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     definirSelecionado(local);
     definirLocais([]);
     definirCepsDoEndereco(local.cep ? [{ cep: local.cep, bairro: local.bairro || '' }] : []);
-    if (modoBusca === 'endereco') definirConsulta(local.nome);
     definirErro('');
     if (local.uf && local.cidade && local.logradouro) {
       try {
@@ -266,7 +265,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       {buscando ? <View style={estilos.resultados}><ActivityIndicator size="small" color={cores.primario} /><Text style={estilos.endereçoResultado}>Buscando lugares e endereços…</Text></View> : null}
       {locais.length ? <View style={estilos.resultados}>
         <TituloSecao título="ESCOLHA UM RESULTADO" />
-        {locais.map(local => <Pressable key={local.id} accessibilityRole="button" onPress={() => escolherLocal(local)} style={estilos.resultado}><Ionicons name="location-outline" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{local.nome}{local.aproximado ? ' · referência aproximada' : ''}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{local.endereço}{local.cep ? ` · CEP ${local.cep}` : ''}</Text></View></Pressable>)}
+        {locais.map((local, índice) => <Pressable key={local.id} accessibilityRole="button" onPress={() => escolherLocal(local)} style={estilos.resultado}><Ionicons name="location-outline" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{local.nome}{local.aproximado ? ' · referência aproximada' : ''}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{local.endereço}{local.cep ? ` · CEP ${local.cep}` : ''}</Text><Text style={estilos.textoCep}>{índice === 0 ? 'Melhor correspondência para a busca' : 'Sugestão de local'}</Text></View></Pressable>)}
       </View> : null}
       <Pressable accessibilityRole="button" onPress={localizarAgora} style={estilos.botaoLocalização}><Ionicons name="locate-outline" size={17} color={cores.primario} /><Text style={estilos.textoLocalização}>Mostrar minha localização agora</Text></Pressable>
       {erro ? <Aviso ícone="alert-circle-outline" tom="alerta" texto={erro} /> : null}

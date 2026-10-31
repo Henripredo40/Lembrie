@@ -1215,6 +1215,24 @@ function formatarResultadoLugar(item, cepPreferido = '') {
   };
 }
 
+function pontuarCorrespondenciaBusca(item, consulta) {
+  const normalizar = valor => String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  const textoConsulta = normalizar(consulta);
+  const textoResultado = normalizar(`${item.name || ''} ${item.display_name || ''}`);
+  const termos = textoConsulta.split(' ').filter(termo => termo.length > 1);
+  const encontrados = termos.filter(termo => textoResultado.includes(termo)).length;
+  return {
+    exata: textoResultado.includes(textoConsulta),
+    cobertura: termos.length ? encontrados / termos.length : 0,
+    importancia: Number(item.importance) || 0,
+  };
+}
+
 app.post('/departure/check', auth, async (q, r) => {
   const objects = (
     await db.execute(
@@ -1499,7 +1517,7 @@ app.get('/postal-codes/search', auth, async (q, r) => {
 app.get('/places/search', auth, async (q, r) => {
   const query = String(q.query.q || '').trim();
   if (query.length < 3 || query.length > 120) return r.status(400).json({ error: 'Digite um local com pelo menos 3 caracteres.' });
-  const key = query.toLocaleLowerCase('pt-BR');
+  const key = `search:${query.toLocaleLowerCase('pt-BR')}`;
   const cached = cacheLugares.get(key);
   if (cached && cached.expires > Date.now()) return r.json(cached.places);
 
@@ -1508,26 +1526,42 @@ app.get('/places/search', auth, async (q, r) => {
       const wait = Math.max(0, 1100 - (Date.now() - ultimoPedidoDeMapa));
       if (wait) await new Promise(resolve => setTimeout(resolve, wait));
       ultimoPedidoDeMapa = Date.now();
-      const url = new URL('https://nominatim.openstreetmap.org/search');
-      url.search = new URLSearchParams({
-        q: query,
-        countrycodes: 'br',
-        viewbox: '-48.50,-15.35,-47.25,-16.20',
-        format: 'jsonv2',
-        limit: '5',
-        addressdetails: '1'
-      }).toString();
-      const response = await fetch(url, {
-        headers: {
-          'Accept-Language': 'pt-BR,pt;q=0.9',
-          'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)',
-          'Referer': 'https://lembre-web.onrender.com/'
-        },
-        signal: AbortSignal.timeout(12000)
-      });
-      if (!response.ok) throw new Error('Busca de locais temporariamente indisponível.');
-      const data = await response.json();
-      return data.map(item => formatarResultadoLugar(item));
+      const executarBusca = async termo => {
+        const url = new URL('https://nominatim.openstreetmap.org/search');
+        url.search = new URLSearchParams({
+          q: termo,
+          countrycodes: 'br',
+          viewbox: '-48.50,-15.35,-47.25,-16.20',
+          format: 'jsonv2',
+          limit: '8',
+          addressdetails: '1',
+          dedupe: '1'
+        }).toString();
+        const response = await fetch(url, {
+          headers: {
+            'Accept-Language': 'pt-BR,pt;q=0.9',
+            'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)',
+            'Referer': 'https://lembre-web.onrender.com/'
+          },
+          signal: AbortSignal.timeout(12000)
+        });
+        if (!response.ok) throw new Error('Busca de locais temporariamente indisponível.');
+        return response.json();
+      };
+      let data = await executarBusca(query);
+      // For a Brazilian address that returned no match, try the same text with
+      // Brasília as context before giving up. Keep this as a suggestion only.
+      if (!data.length && !/bras[ií]lia|distrito federal|\bdf\b/i.test(query)) {
+        const wait = Math.max(0, 1100 - (Date.now() - ultimoPedidoDeMapa));
+        if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+        ultimoPedidoDeMapa = Date.now();
+        data = await executarBusca(`${query}, Brasília, Distrito Federal, Brasil`);
+      }
+      const normalizar = valor => String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').replace(/[^a-z0-9]+/g, ' ').trim();
+      return data
+        .map(item => ({ item, score: pontuarCorrespondenciaBusca(item, query) }))
+        .sort((a, b) => Number(b.score.exata) - Number(a.score.exata) || b.score.cobertura - a.score.cobertura || b.score.importancia - a.score.importancia)
+        .map(({ item }) => ({ ...formatarResultadoLugar(item), consulta: normalizar(query) }));
     }));
     cacheLugares.set(key, { places, expires: Date.now() + 60 * 60 * 1000 });
     if (cacheLugares.size > 300) cacheLugares.delete(cacheLugares.keys().next().value);
