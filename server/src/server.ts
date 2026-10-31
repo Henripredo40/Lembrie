@@ -1722,7 +1722,7 @@ async function carregarContextoIA(usuario) {
 
 async function gerarSugestoesGemini(destination, objects, nearbyCategories = [], nearbyPlaces = []) {
   const resposta = await gerarRespostaGemini(JSON.stringify({
-    tarefa: 'Selecione todos os objetos já cadastrados que sejam realmente úteis para este destino e para os locais mapeados nas proximidades. Inclua os itens essenciais pertinentes. Não sugira objetos novos nem itens que não estejam na lista da conta; não selecione tudo por padrão. Se não houver dados suficientes, escolha somente os essenciais que fazem sentido e explique a incerteza no campo reason.',
+    tarefa: 'Recomende objetos cadastrados que sejam úteis para o destino e para os locais reais encontrados por perto. Use os nomes dos locais e as distâncias para dar contexto; locais a mais de 700 metros são referências aproximadas, não o destino exato. Inclua os itens essenciais pertinentes. Não invente objetos nem selecione tudo por padrão. Se o destino ou os locais próximos não forem específicos, escolha somente itens que façam sentido e explique a incerteza no campo reason.',
     destino: destination,
     categoriasDeLocaisProximos: nearbyCategories,
     estabelecimentosMapeadosProximos: nearbyPlaces,
@@ -2072,7 +2072,6 @@ app.get('/places/nearby', auth, async (q, r) => {
   const cacheKey = `nearby:${latitude.toFixed(3)}:${longitude.toFixed(3)}`;
   const cached = cacheLugares.get(cacheKey);
   if (cached && cached.expires > Date.now()) return r.json(cached.places);
-  const query = `[out:json][timeout:12];(nwr(around:700,${latitude},${longitude})[amenity~"^(school|university|college|hospital|clinic|doctors|pharmacy|restaurant|cafe|fast_food|marketplace|bank|bus_station|parking|library|cinema|theatre)$"];nwr(around:700,${latitude},${longitude})[shop~"^(supermarket|convenience|mall|bakery|stationery)$"];nwr(around:700,${latitude},${longitude})[tourism~"^(hotel|museum|attraction)$"];nwr(around:700,${latitude},${longitude})[leisure~"^(sports_centre|fitness_centre|park)$"];);out center tags 35;`;
   const categoriaDoLocal = tags => {
     const amenity = tags.amenity || '';
     if (/school|university|college|library/.test(amenity)) return 'Educação';
@@ -2087,25 +2086,37 @@ app.get('/places/nearby', auth, async (q, r) => {
     return '';
   };
   try {
-    const resposta = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)' },
-      body: new URLSearchParams({ data: query }),
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!resposta.ok) throw new Error(`Overpass respondeu com HTTP ${resposta.status}.`);
-    const dados = await resposta.json();
     const distancia = (lat2, lon2) => {
       const rad = valor => valor * Math.PI / 180;
       const dLat = rad(lat2 - latitude), dLon = rad(lon2 - longitude);
       const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(latitude)) * Math.cos(rad(lat2)) * Math.sin(dLon / 2) ** 2;
       return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
     };
-    const locais = (Array.isArray(dados.elements) ? dados.elements : []).map(item => {
-      const tags = item.tags || {};
-      const centro = item.center || item;
-      return { nome: String(tags.name || '').trim(), categoria: categoriaDoLocal(tags), distancia: Number.isFinite(Number(centro.lat)) && Number.isFinite(Number(centro.lon)) ? distancia(Number(centro.lat), Number(centro.lon)) : null };
-    }).filter(item => item.categoria).sort((a, b) => (a.distancia ?? 99999) - (b.distancia ?? 99999));
+    const consultarRaio = async raio => {
+      const query = `[out:json][timeout:12];(nwr(around:${raio},${latitude},${longitude})[amenity~"^(school|university|college|hospital|clinic|doctors|pharmacy|restaurant|cafe|fast_food|marketplace|bank|bus_station|parking|library|cinema|theatre)$"];nwr(around:${raio},${latitude},${longitude})[shop~"^(supermarket|convenience|mall|bakery|stationery)$"];nwr(around:${raio},${latitude},${longitude})[tourism~"^(hotel|museum|attraction)$"];nwr(around:${raio},${latitude},${longitude})[leisure~"^(sports_centre|fitness_centre|park)$"];);out center tags 35;`;
+      const resposta = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'User-Agent': 'LembrieApp/1.0 (+https://lembre-web.onrender.com/)' },
+        body: new URLSearchParams({ data: query }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!resposta.ok) throw new Error(`Overpass respondeu com HTTP ${resposta.status}.`);
+      const dados = await resposta.json();
+      return (Array.isArray(dados.elements) ? dados.elements : []).map(item => {
+        const tags = item.tags || {};
+        const centro = item.center || item;
+        return { nome: String(tags.name || '').trim(), categoria: categoriaDoLocal(tags), distancia: Number.isFinite(Number(centro.lat)) && Number.isFinite(Number(centro.lon)) ? distancia(Number(centro.lat), Number(centro.lon)) : null };
+      }).filter(item => item.categoria).sort((a, b) => (a.distancia ?? 99999) - (b.distancia ?? 99999));
+    };
+    let locais = await consultarRaio(700);
+    if (!locais.some(item => item.nome)) {
+      try {
+        const aproximados = await consultarRaio(2000);
+        if (aproximados.length) locais = aproximados;
+      } catch (error) {
+        console.error('Busca aproximada de pontos próximos indisponível:', error.message);
+      }
+    }
     const lugares = { categories: [...new Set(locais.map(item => item.categoria))].slice(0, 8), places: locais.filter(item => item.nome).slice(0, 8) };
     cacheLugares.set(cacheKey, { places: lugares, expires: Date.now() + 15 * 60 * 1000 });
     r.json(lugares);

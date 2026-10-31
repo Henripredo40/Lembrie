@@ -9,7 +9,7 @@ import estilos from '../estilos/TelaHistorico.estilos';
 export default function TelaHistorico({ eventos }) {
   return (
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo}>
-      <Text style={estilos.sobretitulo}>REGISTROS</Text>
+      <Text style={estilos.sobretitulo}>HISTÓRICO</Text>
       <Text style={estilos.titulo}>Histórico</Text>
       <Text style={estilos.subtitulo}>Confira as últimas atividades da sua conta.</Text>
       {eventos.length ? <View style={estilos.lista}>

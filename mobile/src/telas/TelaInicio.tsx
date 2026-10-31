@@ -7,11 +7,10 @@ import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores, raios } from '../tema';
 import { categoriasDeObjeto, chaveiroEstáConectado, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
-import { formatarData } from '../utils/date';
 
 type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string }; rotina?: boolean };
 
-export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = true, objetos, eventos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
+export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = true, mostrarAtalhosFlutuantes = true, objetos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
   const [categoriasDaRotina, definirCategoriasDaRotina] = useState<string[]>([]);
 
   useEffect(() => {
@@ -195,32 +194,21 @@ export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = tru
         <Aviso ícone="information-circle-outline" texto="A conferência manual está disponível. Para detecção por proximidade e alertas Bluetooth, associe um chaveiro compatível ao objeto." />
       ) : null}
 
-      <TituloSecao título="ATIVIDADE RECENTE" ação={eventos.length ? 'Ver histórico' : undefined} aoPressionar={() => abrirTela('historico')} />
-      {eventos.length ? (
-        <View style={estilos.cartaoAtividade}>
-          {eventos.slice(0, 3).map((evento, índice) => (
-            <View key={String(evento.id || índice)} style={[estilos.linhaAtividade, índice > 0 && estilos.linhaAtividadeComBorda]}>
-              <View style={estilos.iconeAtividade}><Ionicons name={evento.type === 'departure' ? 'walk-outline' : evento.type === 'lista_saida' ? 'checkbox-outline' : 'time-outline'} size={17} color={cores.primario} /></View>
-              <View style={estilos.textoAtividade}><Text style={estilos.mensagemAtividade} numberOfLines={2}>{evento.message || 'Atividade registrada'}</Text><Text style={estilos.dataAtividade}>{formatarData(evento.created_at)}</Text></View>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <Text style={estilos.semAtividade}>As atividades e conferências aparecerão aqui.</Text>
-      )}
       <View style={{ height: 24 }} />
         </>
       )}
     </ScrollView>
-    <Pressable accessibilityRole="button" accessibilityLabel="Abrir Mapa e rotina para pesquisar um destino e planejar o que levar" onPress={() => abrirTela('mapa')} style={({ pressed }) => [estilos.mapaFlutuante, pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] }]}>
+    {mostrarAtalhosFlutuantes ? <Pressable accessibilityRole="button" accessibilityLabel="Abrir Mapa e rotina para pesquisar um destino e planejar o que levar" onPress={() => abrirTela('mapa')} style={({ pressed }) => [estilos.mapaFlutuante, pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] }]}>
       <View style={estilos.iconeMapaFlutuante}><Ionicons name="map-outline" size={20} color={cores.primario} /></View>
       <View style={estilos.textoMapaFlutuante}><Text style={estilos.tituloMapaFlutuante}>Mapa e rotina</Text><Text numberOfLines={2} style={estilos.subtituloMapaFlutuante}>Pesquise um destino e planeje o que levar</Text></View>
       <Ionicons name="chevron-forward" size={17} color={cores.primario} />
-    </Pressable>
+    </Pressable> : null}
+    {mostrarAtalhosFlutuantes ?
     <Pressable accessibilityRole="button" accessibilityLabel="Abrir ajuda com IA" onPress={() => abrirTela('assistente')} style={({ pressed }) => [estilos.ajudaFlutuante, pressed && { opacity: 0.86, transform: [{ scale: 0.97 }] }]}>
       <Ionicons name="sparkles" size={18} color={cores.branco} />
       <Text style={estilos.textoAjudaFlutuante}>Ajuda</Text>
     </Pressable>
+    : null}
     </View>
   );
 }

@@ -102,10 +102,14 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     definirMotivoSugestaoIA('');
     definirRespostaIAAtiva(null);
     definirLocaisProximos({ categories: [], places: [] });
+    definirObjetosSugeridos([]);
+    definirObjetosCadastrados([]);
+    definirObjetosSelecionados([]);
+    definirGerandoSugestoesIA(false);
     definirLocais([]);
     definirCepsDoEndereco(local.cep ? [{ cep: local.cep, bairro: local.bairro || '' }] : []);
     definirErro('');
-    const próximosPromise = carregarLocaisProximos(local.latitude, local.longitude);
+    const próximosPromise = carregarLocaisProximos(local.latitude, local.longitude, idBusca);
     if (local.uf && local.cidade && local.logradouro) {
       try {
         const ceps = await api(`/postal-codes/search?uf=${encodeURIComponent(local.uf)}&city=${encodeURIComponent(local.cidade)}&street=${encodeURIComponent(local.logradouro)}`);
@@ -119,27 +123,27 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       }
     }
     if (idBusca !== buscaPontoAtual.current) return;
+    const próximos = await próximosPromise;
+    if (idBusca !== buscaPontoAtual.current) return;
     const destino = [local.nome, local.endereço].filter(Boolean).join(', ').slice(0, 180);
-    await carregarItensDoDestino(destino, idBusca);
-    void próximosPromise.then(próximos => {
-      if (idBusca === buscaPontoAtual.current && próximos.categories.length) return carregarItensDoDestino(destino, idBusca, próximos.categories);
-    });
+    const dados = await carregarItensDoDestino(destino, idBusca, próximos.categories);
+    if (idBusca === buscaPontoAtual.current) await sugerirItensComIA(destino, próximos, dados?.allRegisteredItems || [], idBusca);
   }
 
-  async function carregarLocaisProximos(latitude, longitude) {
+  async function carregarLocaisProximos(latitude, longitude, idBusca?) {
     if (!Number.isFinite(Number(latitude)) || !Number.isFinite(Number(longitude))) return { categories: [], places: [] };
     definirBuscandoProximidade(true);
     try {
       const dados = await api(`/places/nearby?lat=${latitude}&lon=${longitude}`);
       const resultado = { categories: Array.isArray(dados.categories) ? dados.categories : [], places: Array.isArray(dados.places) ? dados.places : [] };
-      definirLocaisProximos(resultado);
+      if (idBusca === undefined || idBusca === buscaPontoAtual.current) definirLocaisProximos(resultado);
       return resultado;
     } catch {
       const vazio = { categories: [], places: [] };
-      definirLocaisProximos(vazio);
+      if (idBusca === undefined || idBusca === buscaPontoAtual.current) definirLocaisProximos(vazio);
       return vazio;
     } finally {
-      definirBuscandoProximidade(false);
+      if (idBusca === undefined || idBusca === buscaPontoAtual.current) definirBuscandoProximidade(false);
     }
   }
 
@@ -153,32 +157,36 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       definirObjetosSugeridos(relacionados);
       definirObjetosCadastrados(todos);
       definirObjetosSelecionados(relacionados.map(item => String(item.id)));
+      return { allRegisteredItems: todos, registeredItems: relacionados };
     } catch (falha) {
       if (idBusca !== undefined && idBusca !== buscaPontoAtual.current) return;
       definirObjetosSugeridos([]);
       definirObjetosCadastrados([]);
       definirObjetosSelecionados([]);
       definirErro('O local foi selecionado, mas não consegui carregar seus objetos. Tente novamente.');
+      return null;
     }
   }
 
-  async function sugerirItensComIA() {
-    if (!selecionado) return;
+  async function sugerirItensComIA(destinoInformado?, contextoProximo = locaisProximos, objetosDisponiveis = objetosCadastrados, idBusca?) {
+    const destino = String(destinoInformado || [selecionado?.nome, selecionado?.endereço].filter(Boolean).join(', ')).slice(0, 180);
+    if (destino.length < 2) return;
     definirGerandoSugestoesIA(true);
     definirErro('');
     try {
-      const destinoComEndereco = [selecionado.nome, selecionado.endereço].filter(Boolean).join(', ').slice(0, 180);
-      const dados = await api('/recommendations/ai', { method: 'POST', body: JSON.stringify({ destination: destinoComEndereco, nearbyCategories: locaisProximos.categories, nearbyPlaces: locaisProximos.places }) });
+      const dados = await api('/recommendations/ai', { method: 'POST', body: JSON.stringify({ destination: destino, nearbyCategories: contextoProximo.categories, nearbyPlaces: contextoProximo.places }) });
+      if (idBusca !== undefined && idBusca !== buscaPontoAtual.current) return;
       const itensRecomendados = Array.isArray(dados.registeredItems) ? dados.registeredItems : [];
       definirObjetosRecomendadosIA(itensRecomendados);
       definirMotivoSugestaoIA(String(dados.reason || ''));
-      const ids = objetosCadastrados.filter(item => itensRecomendados.some(nome => nome.toLocaleLowerCase('pt-BR') === String(item.name).toLocaleLowerCase('pt-BR'))).map(item => String(item.id));
+      const ids = objetosDisponiveis.filter(item => itensRecomendados.some(nome => nome.toLocaleLowerCase('pt-BR') === String(item.name).toLocaleLowerCase('pt-BR'))).map(item => String(item.id));
       definirObjetosSelecionados(atuais => [...new Set([...atuais, ...ids])]);
       definirRespostaIAAtiva(dados.ai === true);
     } catch (falha) {
+      if (idBusca !== undefined && idBusca !== buscaPontoAtual.current) return;
       definirErro(falha.message || 'Não consegui gerar sugestões agora. Tente novamente.');
     } finally {
-      definirGerandoSugestoesIA(false);
+      if (idBusca === undefined || idBusca === buscaPontoAtual.current) definirGerandoSugestoesIA(false);
     }
   }
 
@@ -216,17 +224,29 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
   }
 
   async function localizarAgora() {
-    buscaPontoAtual.current += 1;
+    const idBusca = ++buscaPontoAtual.current;
     definirErro('');
     try {
       const permissão = await Location.requestForegroundPermissionsAsync();
       if (permissão.status !== 'granted') return definirErro('Permita o acesso à localização durante o uso para mostrar sua posição no mapa.');
       const posição = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      definirSelecionado({ nome: 'Minha localização', endereço: 'Localização atual do aparelho', latitude: posição.coords.latitude, longitude: posição.coords.longitude });
+      if (idBusca !== buscaPontoAtual.current) return;
+      const local = { nome: 'Minha localização', endereço: 'Localização atual do aparelho', latitude: posição.coords.latitude, longitude: posição.coords.longitude };
+      definirSelecionado(local);
+      definirObjetosRecomendadosIA([]);
+      definirMotivoSugestaoIA('');
+      definirRespostaIAAtiva(null);
       definirCepsDoEndereco([]);
-      await carregarItensDoDestino('');
+      definirObjetosSugeridos([]);
+      definirObjetosCadastrados([]);
+      definirObjetosSelecionados([]);
+      definirGerandoSugestoesIA(false);
+      const próximos = await carregarLocaisProximos(local.latitude, local.longitude, idBusca);
+      if (idBusca !== buscaPontoAtual.current) return;
+      const dados = await carregarItensDoDestino(local.nome, idBusca, próximos.categories);
+      if (idBusca === buscaPontoAtual.current) await sugerirItensComIA(local.nome, próximos, dados?.allRegisteredItems || [], idBusca);
     } catch (falha) {
-      definirErro('Não consegui obter sua localização. Verifique o GPS e tente novamente.');
+      if (idBusca === buscaPontoAtual.current) definirErro('Não consegui obter sua localização. Verifique o GPS e tente novamente.');
     }
   }
 
@@ -281,6 +301,9 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     definirRespostaIAAtiva(null);
     definirLocaisProximos({ categories: [], places: [] });
     definirCepsDoEndereco([]);
+    definirObjetosCadastrados([]);
+    definirObjetosSelecionados([]);
+    definirGerandoSugestoesIA(false);
     definirLocais([]);
     definirObjetosSugeridos([]);
     definirErro('');
@@ -292,16 +315,21 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       const localSelecionado = { ...local, latitude, longitude };
       definirSelecionado(localSelecionado);
       definirCepsDoEndereco(local.cep ? [{ cep: local.cep, bairro: local.bairro || '' }] : []);
-      const próximosPromise = carregarLocaisProximos(latitude, longitude);
+      const próximosPromise = carregarLocaisProximos(latitude, longitude, idBusca);
       const destino = [localSelecionado.nome, localSelecionado.endereço].filter(Boolean).join(', ').slice(0, 180);
-      await carregarItensDoDestino(destino, idBusca);
-      void próximosPromise.then(próximos => {
-        if (idBusca === buscaPontoAtual.current && próximos.categories.length) return carregarItensDoDestino(destino, idBusca, próximos.categories);
-      });
+      const próximos = await próximosPromise;
+      if (idBusca !== buscaPontoAtual.current) return;
+      const dados = await carregarItensDoDestino(destino, idBusca, próximos.categories);
+      if (idBusca === buscaPontoAtual.current) await sugerirItensComIA(destino, próximos, dados?.allRegisteredItems || [], idBusca);
     } catch (falha) {
       if (idBusca !== buscaPontoAtual.current) return;
-      definirSelecionado({ ...ponto, nome: 'Ponto selecionado no mapa', endereço: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}` });
-      definirErro(falha.message || 'Marquei o ponto, mas não consegui identificar o endereço. Você ainda pode usar estas coordenadas como destino.');
+      const localAproximado = { ...ponto, nome: 'Ponto próximo ao local marcado', endereço: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`, pontoAproximado: true };
+      definirSelecionado(localAproximado);
+      definirErro('');
+      const próximos = await carregarLocaisProximos(latitude, longitude, idBusca);
+      if (idBusca !== buscaPontoAtual.current) return;
+      const dados = await carregarItensDoDestino(localAproximado.nome, idBusca, próximos.categories);
+      if (idBusca === buscaPontoAtual.current) await sugerirItensComIA(localAproximado.nome, próximos, dados?.allRegisteredItems || [], idBusca);
     }
   }
 
@@ -334,7 +362,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       />
       <Text style={estilos.atribuição}>Mapa © OpenStreetMap contributors</Text>
       {selecionado ? <>
-        <View style={estilos.localSelecionado}><Ionicons name="location" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{selecionado.nome}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{selecionado.endereço}</Text>{selecionado.aproximado ? <Text style={estilos.endereçoResultado}>O CEP indica uma referência da rua/região. Para chegar ao número certo, arraste o mapa até o ponto desejado.</Text> : null}{selecionado.cep ? <Text style={estilos.textoCep}>CEP {selecionado.cep}</Text> : null}</View></View>
+        <View style={estilos.localSelecionado}><Ionicons name="location" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{selecionado.nome}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{selecionado.endereço}</Text>{selecionado.pontoAproximado ? <Text style={estilos.endereçoResultado}>Endereço exato indisponível; a recomendação usa os locais mapeados mais próximos.</Text> : selecionado.aproximado ? <Text style={estilos.endereçoResultado}>O CEP indica uma referência da rua/região. Para chegar ao número certo, toque no ponto desejado do mapa.</Text> : null}{selecionado.cep ? <Text style={estilos.textoCep}>CEP {selecionado.cep}</Text> : null}</View></View>
         {locaisProximos.categories.length ? <View style={estilos.contextoProximo}><Text style={estilos.tituloContextoProximo}>O que existe por perto</Text><Text style={estilos.textoContextoProximo}>{locaisProximos.categories.join(' · ')}</Text>{locaisProximos.places.length ? <Text style={estilos.textoContextoProximo}>{locaisProximos.places.map(local => local.distancia != null ? `${local.nome} (${local.distancia} m)` : local.nome).join(' · ')}</Text> : null}</View> : null}
         {cepsDoEndereco.length > 1 ? <View style={estilos.cepsEncontrados}><Text style={estilos.endereçoResultado}>Mais de um CEP encontrado para este logradouro. Confira o bairro para escolher:</Text>{cepsDoEndereco.map(opção => <Pressable key={opção.cep} onPress={() => definirSelecionado(atual => ({ ...atual, cep: opção.cep, bairro: opção.bairro }))} style={[estilos.opcaoCep, selecionado.cep === opção.cep && estilos.opcaoCepAtiva]}><Text style={[estilos.textoOpcaoCep, selecionado.cep === opção.cep && estilos.textoOpcaoCepAtivo]}>{opção.cep}{opção.bairro ? ` · ${opção.bairro}` : ''}</Text></Pressable>)}</View> : null}
         <View style={estilos.cartaoSugestões}>
@@ -351,17 +379,17 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
             <Text style={estilos.notaSugestões}>Cadastre seus objetos para receber sugestões personalizadas e montar sua lista de saída.</Text>
             <Botao título="Cadastrar objetos" secundário aoPressionar={abrirObjetos} />
           </>}
-          <Pressable accessibilityRole="button" onPress={sugerirItensComIA} disabled={gerandoSugestoesIA || buscandoProximidade} style={estilos.botaoLocalização}>
+          <Pressable accessibilityRole="button" onPress={() => sugerirItensComIA()} disabled={gerandoSugestoesIA || buscandoProximidade} style={estilos.botaoLocalização}>
             {gerandoSugestoesIA || buscandoProximidade ? <ActivityIndicator size="small" color={cores.primario} /> : <Ionicons name="sparkles-outline" size={17} color={cores.primario} />}
             <Text style={estilos.textoLocalização}>{buscandoProximidade ? 'Identificando locais próximos…' : gerandoSugestoesIA ? 'Analisando seus objetos…' : 'Recomendar itens com Gemini'}</Text>
           </Pressable>
-          {objetosRecomendadosIA.length ? <View style={estilos.listaSugestões}>
-            <Text style={estilos.notaSugestões}>{respostaIAAtiva ? 'A IA Gemini recomenda estes itens da sua lista para o destino e os pontos próximos:' : 'Itens cadastrados relacionados ao destino:'} {objetosRecomendadosIA.join(', ')}.{motivoSugestaoIA ? ` ${motivoSugestaoIA}` : ''}</Text>
-            <Pressable accessibilityRole="button" onPress={() => {
+          {objetosRecomendadosIA.length || motivoSugestaoIA ? <View style={estilos.listaSugestões}>
+            <Text style={estilos.notaSugestões}>{objetosRecomendadosIA.length ? (respostaIAAtiva ? 'A IA Gemini recomenda estes itens da sua lista para o destino e os pontos próximos:' : 'Itens cadastrados relacionados ao destino:') + ' ' + objetosRecomendadosIA.join(', ') + '.' : 'Não encontrei objetos cadastrados específicos para este destino.'}{motivoSugestaoIA ? ` ${motivoSugestaoIA}` : ''}</Text>
+            {objetosRecomendadosIA.length ? <Pressable accessibilityRole="button" onPress={() => {
               const ids = objetosCadastrados.filter(item => objetosRecomendadosIA.some(nome => nome.toLocaleLowerCase('pt-BR') === String(item.name).toLocaleLowerCase('pt-BR'))).map(item => String(item.id));
               definirObjetosSelecionados(atuais => [...new Set([...atuais, ...ids])]);
               definirResultadoConferencia(null);
-            }} style={estilos.botaoLocalização}><Ionicons name="checkmark-circle-outline" size={17} color={cores.primario} /><Text style={estilos.textoLocalização}>Adicionar à lista de saída</Text></Pressable>
+            }} style={estilos.botaoLocalização}><Ionicons name="checkmark-circle-outline" size={17} color={cores.primario} /><Text style={estilos.textoLocalização}>Adicionar à lista de saída</Text></Pressable> : null}
           </View> : null}
           {objetosCadastrados.length ? <>
             <Text style={estilos.resumoSelecao}>{objetosSelecionados.length} de {objetosCadastrados.length} {objetosSelecionados.length === 1 ? 'objeto selecionado' : 'objetos selecionados'}</Text>
