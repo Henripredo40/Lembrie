@@ -8,9 +8,12 @@ import { Aviso, Botao, CampoTexto, EstadoVazio, TituloSecao } from '../component
 import { cores, raios } from '../tema';
 import { categoriasDeObjeto, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
 
+const CATEGORIA_PERSONALIZADA = '__personalizada__';
+
 export default function TelaObjetos({ objetos, definirObjetos, api, categoriaInicial, notificar }) {
   const [nome, setNome] = useState('');
   const [categoria, setCategoria] = useState('Chaves');
+  const [categoriaPersonalizada, setCategoriaPersonalizada] = useState('');
   const [essencial, setEssencial] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [erroFormulario, setErroFormulario] = useState('');
@@ -20,8 +23,17 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
   const [editando, setEditando] = useState(null);
   const [nomeEdicao, setNomeEdicao] = useState('');
   const [categoriaEdicao, setCategoriaEdicao] = useState('Outros');
+  const [categoriaEdicaoPersonalizada, setCategoriaEdicaoPersonalizada] = useState('');
   const [essencialEdicao, setEssencialEdicao] = useState(false);
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+
+  const categoriasDisponiveis = useMemo(() => {
+    const predefinidas = new Set(categoriasDeObjeto.map((opção) => normalizarTexto(opção.nome)));
+    const personalizadas = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter((nome) => nome.length > 0))]
+      .filter((nome) => !predefinidas.has(normalizarTexto(nome)))
+      .map((nome) => ({ nome, ícone: 'tag-outline' as const }));
+    return [...categoriasDeObjeto, ...personalizadas];
+  }, [objetos]);
 
   useEffect(() => {
     setFiltroCategoria(categoriaInicial || '');
@@ -37,9 +49,16 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
     return lista;
   }, [objetos, filtro, filtroCategoria, busca]);
 
+  const categoriaParaSalvar = categoria === CATEGORIA_PERSONALIZADA ? categoriaPersonalizada.trim() : categoria;
+  const categoriaEdicaoParaSalvar = categoriaEdicao === CATEGORIA_PERSONALIZADA ? categoriaEdicaoPersonalizada.trim() : categoriaEdicao;
+
   async function cadastrarObjeto() {
     if (!nome.trim()) {
       setErroFormulario('Dê um nome para o objeto.');
+      return;
+    }
+    if (!categoriaParaSalvar) {
+      setErroFormulario('Digite o nome da categoria personalizada.');
       return;
     }
     setErroFormulario('');
@@ -47,11 +66,12 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
     try {
       const novo = await api('/objects', {
         method: 'POST',
-        body: JSON.stringify({ name: nome.trim(), category: categoria, essential: essencial }),
+        body: JSON.stringify({ name: nome.trim(), category: categoriaParaSalvar, essential: essencial }),
       });
       definirObjetos((atuais) => [novo, ...atuais]);
       setNome('');
       setCategoria('Chaves');
+      setCategoriaPersonalizada('');
       setEssencial(false);
       notificar('Objeto cadastrado. A ilustração foi escolhida automaticamente pela categoria e pelo nome.');
     } catch (erro) {
@@ -64,7 +84,10 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
   function abrirEdicao(objeto) {
     setEditando(objeto);
     setNomeEdicao(objeto.name || '');
-    setCategoriaEdicao(objeto.category || 'Outros');
+    const categoriaAtual = objeto.category || 'Outros';
+    const categoriaDisponivel = categoriasDisponiveis.find((opção) => normalizarTexto(opção.nome) === normalizarTexto(categoriaAtual));
+    setCategoriaEdicao(categoriaDisponivel ? categoriaDisponivel.nome : CATEGORIA_PERSONALIZADA);
+    setCategoriaEdicaoPersonalizada(categoriaDisponivel ? '' : categoriaAtual);
     setEssencialEdicao(objetoÉEssencial(objeto));
   }
 
@@ -73,14 +96,18 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
       notificar('Dê um nome para o objeto antes de salvar.');
       return;
     }
+    if (!categoriaEdicaoParaSalvar) {
+      notificar('Digite o nome da categoria personalizada.');
+      return;
+    }
     setSalvandoEdicao(true);
     try {
       await api('/objects/' + editando.id, {
         method: 'PATCH',
-        body: JSON.stringify({ name: nomeEdicao.trim(), category: categoriaEdicao, essential: essencialEdicao }),
+        body: JSON.stringify({ name: nomeEdicao.trim(), category: categoriaEdicaoParaSalvar, essential: essencialEdicao }),
       });
       definirObjetos((atuais) => atuais.map((objeto) => String(objeto.id) === String(editando.id)
-        ? { ...objeto, name: nomeEdicao.trim(), category: categoriaEdicao, essential: essencialEdicao, important: essencialEdicao }
+        ? { ...objeto, name: nomeEdicao.trim(), category: categoriaEdicaoParaSalvar, essential: essencialEdicao, important: essencialEdicao }
         : objeto));
       setEditando(null);
       notificar('Alterações salvas.');
@@ -121,19 +148,24 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
         <View style={estilos.cabecalhoFormulario}>
           <View style={estilos.miniIcone}><Ionicons name="add" size={19} color={cores.primario} /></View>
           <View style={{ flex: 1 }}><Text style={estilos.tituloFormulario}>Adicionar objeto</Text><Text style={estilos.legendaFormulario}>A imagem muda conforme o nome e a categoria.</Text></View>
-          <ImagemObjeto nome={nome} categoria={categoria} tamanho={25} compacto />
+          <ImagemObjeto nome={nome} categoria={categoria === CATEGORIA_PERSONALIZADA ? categoriaPersonalizada : categoria} tamanho={25} compacto />
         </View>
 
         <CampoTexto rótulo="Nome do objeto" value={nome} onChangeText={(valor) => { setNome(valor); setErroFormulario(''); }} placeholder="Ex.: Chaves de casa" maxLength={120} returnKeyType="done" />
         <Text style={estilos.rotuloCategoria}>Categoria</Text>
         <View style={estilos.gradeCategorias}>
-          {categoriasDeObjeto.map((opção) => (
+          {categoriasDisponiveis.map((opção) => (
             <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoria === opção.nome }} onPress={() => setCategoria(opção.nome)} style={[estilos.opcaoCategoria, categoria === opção.nome && estilos.opcaoCategoriaAtiva]}>
               <MaterialCommunityIcons name={opção.ícone} size={16} color={categoria === opção.nome ? cores.primario : cores.textoSuave} />
               <Text style={[estilos.textoCategoria, categoria === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text>
             </Pressable>
           ))}
+          <Pressable accessibilityRole="radio" accessibilityState={{ selected: categoria === CATEGORIA_PERSONALIZADA }} onPress={() => setCategoria(CATEGORIA_PERSONALIZADA)} style={[estilos.opcaoCategoria, categoria === CATEGORIA_PERSONALIZADA && estilos.opcaoCategoriaAtiva]}>
+            <Ionicons name="add-circle-outline" size={16} color={categoria === CATEGORIA_PERSONALIZADA ? cores.primario : cores.textoSuave} />
+            <Text style={[estilos.textoCategoria, categoria === CATEGORIA_PERSONALIZADA && estilos.textoCategoriaAtiva]}>Personalizada</Text>
+          </Pressable>
         </View>
+        {categoria === CATEGORIA_PERSONALIZADA ? <CampoTexto rótulo="Nome da categoria" value={categoriaPersonalizada} onChangeText={(valor) => { setCategoriaPersonalizada(valor); setErroFormulario(''); }} placeholder="Ex.: Equipamento esportivo" maxLength={80} /> : null}
 
         <View style={estilos.linhaEssencial}>
           <View style={estilos.iconeEssencial}><Ionicons name="star" size={16} color="#A85B11" /></View>
@@ -184,12 +216,14 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
             <View style={{ width: 62 }} />
           </View>
           <ScrollView contentContainerStyle={estilos.conteudoModal} keyboardShouldPersistTaps="handled">
-            <View style={estilos.previaModal}><ImagemObjeto nome={nomeEdicao} categoria={categoriaEdicao} tamanho={38} /><Text style={estilos.textoPrevia}>Ilustração automática do objeto</Text></View>
+            <View style={estilos.previaModal}><ImagemObjeto nome={nomeEdicao} categoria={categoriaEdicao === CATEGORIA_PERSONALIZADA ? categoriaEdicaoPersonalizada : categoriaEdicao} tamanho={38} /><Text style={estilos.textoPrevia}>Ilustração automática do objeto</Text></View>
             <CampoTexto rótulo="Nome do objeto" value={nomeEdicao} onChangeText={setNomeEdicao} maxLength={120} />
             <Text style={estilos.rotuloCategoria}>Categoria</Text>
             <View style={estilos.gradeCategorias}>
-              {categoriasDeObjeto.map((opção) => <Pressable key={opção.nome} onPress={() => setCategoriaEdicao(opção.nome)} style={[estilos.opcaoCategoria, categoriaEdicao === opção.nome && estilos.opcaoCategoriaAtiva]}><MaterialCommunityIcons name={opção.ícone} size={16} color={categoriaEdicao === opção.nome ? cores.primario : cores.textoSuave} /><Text style={[estilos.textoCategoria, categoriaEdicao === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text></Pressable>)}
+              {categoriasDisponiveis.map((opção) => <Pressable key={opção.nome} accessibilityRole="radio" accessibilityState={{ selected: categoriaEdicao === opção.nome }} onPress={() => setCategoriaEdicao(opção.nome)} style={[estilos.opcaoCategoria, categoriaEdicao === opção.nome && estilos.opcaoCategoriaAtiva]}><MaterialCommunityIcons name={opção.ícone} size={16} color={categoriaEdicao === opção.nome ? cores.primario : cores.textoSuave} /><Text style={[estilos.textoCategoria, categoriaEdicao === opção.nome && estilos.textoCategoriaAtiva]}>{opção.nome}</Text></Pressable>)}
+              <Pressable accessibilityRole="radio" accessibilityState={{ selected: categoriaEdicao === CATEGORIA_PERSONALIZADA }} onPress={() => setCategoriaEdicao(CATEGORIA_PERSONALIZADA)} style={[estilos.opcaoCategoria, categoriaEdicao === CATEGORIA_PERSONALIZADA && estilos.opcaoCategoriaAtiva]}><Ionicons name="add-circle-outline" size={16} color={categoriaEdicao === CATEGORIA_PERSONALIZADA ? cores.primario : cores.textoSuave} /><Text style={[estilos.textoCategoria, categoriaEdicao === CATEGORIA_PERSONALIZADA && estilos.textoCategoriaAtiva]}>Personalizada</Text></Pressable>
             </View>
+            {categoriaEdicao === CATEGORIA_PERSONALIZADA ? <CampoTexto rótulo="Nome da categoria" value={categoriaEdicaoPersonalizada} onChangeText={setCategoriaEdicaoPersonalizada} placeholder="Ex.: Equipamento esportivo" maxLength={80} /> : null}
             <View style={estilos.linhaEssencial}><View style={{ flex: 1 }}><Text style={estilos.tituloEssencial}>Marcar como essencial</Text><Text style={estilos.textoEssencial}>Dá destaque na sua lista de saída.</Text></View><Switch value={essencialEdicao} onValueChange={setEssencialEdicao} trackColor={{ false: '#D0D5DD', true: '#A8A2F1' }} thumbColor={essencialEdicao ? cores.primario : '#F9FAFB'} /></View>
             <Botao título="Salvar alterações" aoPressionar={salvarEdicao} carregando={salvandoEdicao} estilo={{ marginTop: 8 }} />
           </ScrollView>

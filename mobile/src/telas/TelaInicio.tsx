@@ -19,6 +19,14 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
   const detectados = objetos.filter(chaveiroEstáConectado).length;
   const essenciais = objetos.filter(objetoÉEssencial).length;
   const nome = perfil?.name?.trim()?.split(/\s+/)[0] || 'Olá';
+  const categoriasVisiveis = useMemo(() => {
+    const predefinidas = categoriasDeObjeto.slice(0, 8);
+    const todasPredefinidas = new Set(categoriasDeObjeto.map((categoria) => normalizarTexto(categoria.nome)));
+    const personalizadas = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter((categoria) => categoria.length > 0))]
+      .filter((categoria) => !todasPredefinidas.has(normalizarTexto(categoria)))
+      .map((categoria) => ({ nome: categoria, ícone: 'tag-outline' as const }));
+    return [...predefinidas, ...personalizadas];
+  }, [objetos]);
 
   return (
     <ScrollView
@@ -80,7 +88,7 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
 
       <TituloSecao título="CATEGORIAS" ação="Ver objetos" aoPressionar={() => abrirTela('objetos')} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.listaCategorias}>
-        {categoriasDeObjeto.slice(0, 8).map((categoria) => {
+        {categoriasVisiveis.map((categoria) => {
           const quantidade = objetos.filter((objeto) => normalizarTexto(objeto.category) === normalizarTexto(categoria.nome)).length;
           return (
             <Pressable key={categoria.nome} accessibilityRole="button" onPress={() => abrirTela('objetos', { categoria: categoria.nome })} style={estilos.categoria}>
