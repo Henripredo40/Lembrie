@@ -27,7 +27,7 @@ const estilos = StyleSheet.create({
   iconeResumo: { width: 31, height: 31, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   numeroResumo: { color: cores.texto, fontSize: 20, fontWeight: '900', marginTop: 6 },
   legendaResumo: { color: cores.textoSuave, fontSize: 13, fontWeight: '700', marginTop: 1 },
-  listaCategorias: { gap: 9, paddingBottom: 2 },
+  gradeCategoriasInicio: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, paddingBottom: 2 },
   categoria: { width: 112, minHeight: 108, padding: 12, borderRadius: 18, backgroundColor: cores.branco, borderWidth: 1, borderColor: cores.linha },
   iconeCategoria: { width: 34, height: 34, borderRadius: 12, backgroundColor: cores.primarioClaro, alignItems: 'center', justifyContent: 'center' },
   nomeCategoria: { color: cores.texto, fontSize: 13, fontWeight: '800', marginTop: 8 },

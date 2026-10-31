@@ -94,7 +94,7 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
       </View>
 
       <TituloSecao título="CATEGORIAS" ação="Ver objetos" aoPressionar={() => abrirTela('objetos')} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.listaCategorias}>
+      <View style={estilos.gradeCategoriasInicio}>
         {categoriasVisiveis.map((categoria) => {
           const quantidade = objetos.filter((objeto) => normalizarTexto(objeto.category) === normalizarTexto(categoria.nome)).length;
           return (
@@ -105,7 +105,7 @@ export default function TelaInicio({ perfil, objetos, eventos, busca, definirBus
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
 
       <TituloSecao título={busca ? 'RESULTADOS' : 'SEUS OBJETOS'} ação={objetos.length ? 'Ver todos' : undefined} aoPressionar={() => abrirTela('objetos')} />
       {objetosEncontrados.length === 0 ? (
