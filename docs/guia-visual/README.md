@@ -1,8 +1,8 @@
 # Guia visual do Lembriê
 
-Imagens ilustrativas para apresentar as principais áreas do site e do app. Cada arquivo SVG pode ser aberto no navegador ou visualizado diretamente no GitHub.
+Referências visuais das principais telas e funções do site e do aplicativo. Os arquivos SVG podem ser visualizados no navegador ou diretamente no GitHub.
 
-> As telas são mockups explicativos. Textos, estados e recomendações na instalação real podem variar conforme conta, permissões, conexão e dispositivo.
+> A interface pode variar conforme a conta, as permissões, a conexão e o dispositivo.
 
 - [Conheça o Lembriê](./00-visao-geral.svg) — Um guia visual pelas principais áreas do site e do app.
 - [01 · Início](./01-inicio.svg) — A tela inicial reúne seus objetos e atalhos para o dia a dia.
@@ -14,7 +14,6 @@ Imagens ilustrativas para apresentar as principais áreas do site e do app. Cada
 - [07 · Perfil e segurança](./07-perfil-seguranca.svg) — Atualize suas informações e confira os acessos registrados.
 - [08 · Histórico](./08-historico.svg) — Consulte registros de uso e mantenha suas preferências organizadas.
 
-## Arquivos
+## Atualização
 
-Os SVGs estão neste diretório para ficarem separados do código do aplicativo e da API. Para regenerar as imagens, execute node imagem-site.mjs.
-
+Os arquivos deste diretório documentam a experiência do produto e ficam separados do código do aplicativo e da API. Para atualizar as imagens, execute node imagem-site.mjs.

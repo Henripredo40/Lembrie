@@ -87,7 +87,7 @@ function makeSvg(screen) {
   }).join('');
   const title = multiline(screen.title, 650, 262, 43, '#153c36', 750, 1.18);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="960" viewBox="0 0 1280 960" role="img" aria-labelledby="title desc">
-  <title id="title">${esc(screen.section)} — Guia visual Lembriê</title><desc id="desc">${esc(screen.subtitle)} Ilustração explicativa da tela ${esc(screen.page)}.</desc>
+  <title id="title">${esc(screen.section)} — Lembriê</title><desc id="desc">${esc(screen.subtitle)} Referência visual da tela ${esc(screen.page)}.</desc>
   <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#edf7f4"/><stop offset="1" stop-color="#f8faf9"/></linearGradient><filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#173b35" flood-opacity=".12"/></filter></defs>
   <rect width="1280" height="960" fill="url(#bg)"/><circle cx="1170" cy="110" r="125" fill="#dff0eb"/><circle cx="1120" cy="850" r="190" fill="#e8f4f0"/>
   <text x="72" y="74" font-size="16" font-weight="800" letter-spacing="3" fill="#16796d">LEMBRIÊ  /  GUIA VISUAL</text><text x="1204" y="74" text-anchor="end" font-size="14" font-weight="700" fill="#71827e">${esc(screen.number)} / 09</text>
@@ -104,7 +104,7 @@ function makeSvg(screen) {
   <text x="650" y="${screen.title.includes('\n') ? 374 : 322}" font-size="18" fill="#5d706b">Veja como usar esta área:</text>
   <rect x="650" y="410" width="558" height="242" rx="24" fill="#fff" stroke="#e1ebe7"/>
   ${screen.cards.slice(0, 4).map(([heading, body], index) => `<circle cx="683" cy="${450 + index * 48}" r="13" fill="#e8f5f1"/><text x="683" y="${455 + index * 48}" text-anchor="middle" font-size="12" font-weight="800" fill="#16796d">${index + 1}</text><text x="710" y="${447 + index * 48}" font-size="16" font-weight="750" fill="#203b36">${esc(heading)}</text><text x="710" y="${467 + index * 48}" font-size="13" fill="#70807c">${esc(body.length > 53 ? body.slice(0, 50) + '…' : body)}</text>`).join('')}
-  <rect x="650" y="678" width="558" height="150" rx="24" fill="#eaf5f1"/><text x="682" y="720" font-size="14" font-weight="800" letter-spacing="1.1" fill="#16796d">${esc(screen.noteTitle.toLocaleUpperCase('pt-BR'))}</text><text x="682" y="757" font-size="16" fill="#39544e">${esc(screen.note)}</text><text x="682" y="790" font-size="13" fill="#6e827d">Ilustração explicativa · Os dados reais variam conforme a conta.</text>
+  <rect x="650" y="678" width="558" height="150" rx="24" fill="#eaf5f1"/><text x="682" y="720" font-size="14" font-weight="800" letter-spacing="1.1" fill="#16796d">${esc(screen.noteTitle.toLocaleUpperCase('pt-BR'))}</text><text x="682" y="757" font-size="16" fill="#39544e">${esc(screen.note)}</text><text x="682" y="790" font-size="13" fill="#6e827d">Referência visual · A tela pode variar conforme a conta e o dispositivo.</text>
   <text x="72" y="938" font-size="12" fill="#71827e">LEMBRIÊ  ·  Seus objetos, sua rotina e suas listas em um só lugar.</text><text x="1208" y="938" text-anchor="end" font-size="12" fill="#71827e">${esc(screen.number)} — ${esc(screen.page)}</text>
   </svg>`;
 }
@@ -112,4 +112,4 @@ function makeSvg(screen) {
 await mkdir(out, { recursive: true });
 for (const screen of screens) await writeFile(join(out, screen.file), makeSvg(screen), 'utf8');
 const links = screens.map((screen) => `- [${screen.section}](./${screen.file}) — ${screen.subtitle}`).join('\n');
-await writeFile(join(out, 'README.md'), `# Guia visual do Lembriê\n\nImagens ilustrativas para apresentar as principais áreas do site e do app. Cada arquivo SVG pode ser aberto no navegador ou visualizado diretamente no GitHub.\n\n> As telas são mockups explicativos. Textos, estados e recomendações na instalação real podem variar conforme conta, permissões, conexão e dispositivo.\n\n${links}\n\n## Arquivos\n\nOs SVGs estão neste diretório para ficarem separados do código do aplicativo e da API. Para regenerar as imagens, execute node imagem-site.mjs.\n`, 'utf8');
+await writeFile(join(out, 'README.md'), `# Guia visual do Lembriê\n\nReferências visuais das principais telas e funções do site e do aplicativo. Os arquivos SVG podem ser visualizados no navegador ou diretamente no GitHub.\n\n> A interface pode variar conforme a conta, as permissões, a conexão e o dispositivo.\n\n${links}\n\n## Atualização\n\nOs arquivos deste diretório documentam a experiência do produto e ficam separados do código do aplicativo e da API. Para atualizar as imagens, execute node imagem-site.mjs.\n`, 'utf8');
