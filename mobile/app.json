@@ -8,7 +8,8 @@
     "userInterfaceStyle": "light",
     "icon": "./assets/lembre-icon.png",
     "web": {
-      "output": "single"
+      "output": "single",
+      "lang": "pt-BR"
     },
     "android": {
       "package": "com.chaveiroantiperda.app",
