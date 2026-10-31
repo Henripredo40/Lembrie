@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Animated, Image, PanResponder, Pressable, Text, View } from 'react-native';
+import { Animated, Image, PanResponder, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import estilos from '../estilos/MapaOSM.estilos';
 
@@ -34,7 +34,9 @@ type Props = {
 };
 
 export default function MapaOSMBase({ latitude, longitude, onChoose }: Props) {
-  const [dimensões, definirDimensões] = useState({ width: 360, height: 265 });
+  const janela = useWindowDimensions();
+  const alturaMapa = Math.min(390, Math.max(310, Math.round(Math.min(janela.height * 0.42, janela.width * 0.88))));
+  const [dimensões, definirDimensões] = useState({ width: 360, height: alturaMapa });
   const deslocamento = useRef(new Animated.ValueXY()).current;
   const centroX = pixelX(longitude);
   const centroY = pixelY(latitude);
@@ -80,7 +82,7 @@ export default function MapaOSMBase({ latitude, longitude, onChoose }: Props) {
 
   return (
     <View
-      style={estilos.mapa}
+      style={[estilos.mapa, { height: alturaMapa }]}
       {...panResponder.panHandlers}
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;
