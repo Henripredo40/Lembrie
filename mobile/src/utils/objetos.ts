@@ -25,6 +25,7 @@ const desenhos = [
   { termos: ['chave', 'chaves', 'key'], ícone: 'key-chain-variant', fundo: '#E7F4F1', cor: '#16796D' },
   { termos: ['mochila', 'backpack'], ícone: 'bag-personal', fundo: '#EAF5FF', cor: '#2872B8' },
   { termos: ['bolsa', 'sacola'], ícone: 'bag-personal', fundo: '#FFF0F5', cor: '#B84776' },
+  { termos: ['mesa de tenis', 'mesa de ping pong', 'tenis de mesa', 'ping pong', 'ping-pong', 'table tennis'], ícone: 'table-tennis', fundo: '#E8F4FB', cor: '#2872B8' },
   { termos: ['carteira', 'wallet'], ícone: 'wallet', fundo: '#FFF3E3', cor: '#A85B11' },
   { termos: ['celular', 'telefone', 'phone'], ícone: 'cellphone', fundo: '#EAF2FF', cor: '#3767C8' },
   { termos: ['fone', 'headphone', 'audio'], ícone: 'headphones', fundo: '#F2EDFF', cor: '#7353BD' },
