@@ -86,6 +86,11 @@ async function main() {
 }
 
 main().catch(falha => {
-  process.stderr.write((falha?.message || 'Falha ao migrar os dados.') + '\n');
+  const erro = falha as NodeJS.ErrnoException;
+  const mensagem = typeof erro?.message === 'string' && erro.message.trim()
+    ? erro.message.trim()
+    : 'Erro sem descrição fornecida pelo driver.';
+  const codigo = typeof erro?.code === 'string' ? ` (${erro.code})` : '';
+  process.stderr.write(`Falha ao migrar os dados${codigo}: ${mensagem}\n`);
   process.exitCode = 1;
 });
