@@ -2,7 +2,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { EstadoVazio } from '../componentes/Elementos';
 import { cores } from '../tema';
-import { formatarData } from '../utils/date';
+import { formatarData } from '../utilitarios/datas';
 import estilos from '../estilos/TelaHistorico.estilos';
 
 export default function TelaHistorico({ eventos }) {

@@ -9,7 +9,7 @@
     "start:prod": "node dist/server.js",
     "migrate:cloud": "tsx src/migrate-cloud.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/servicos/servicos.test.ts src/rotas/rotas.test.ts ../mobile/src/utils/filaOfflineLogica.test.ts"
+    "test": "tsx --test src/servicos/servicos.test.ts src/rotas/rotas.test.ts ../mobile/src/utilitarios/regrasFilaSemConexao.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

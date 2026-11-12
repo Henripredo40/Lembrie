@@ -1,4 +1,4 @@
-module.exports = function registerInventoryRoutes({ app, auth, idempotenciaOffline, db, crypto, suggestions, registeredSuggestions, formatarResultadoLugar, estadoDosMapas, gerarSugestoesGemini }) {
+module.exports = function registrarRotasDeObjetos({ app, auth, idempotenciaOffline, db, crypto, sugerirItensDestino, sugerirObjetosRelacionados, formatarResultadoLugar, estadoDosMapas, gerarSugestoesGemini }) {
 app.get('/objects', auth, async (q, r) => {
   const [x] = await db.execute(
     `
@@ -33,7 +33,7 @@ app.post('/objects', auth, idempotenciaOffline, async (q, r) => {
       ble_uuid,
       uuid
     } = q.body;
-    const isImportant = q.body.important ?? q.body.essential;
+    const essencialMarcado = q.body.important ?? q.body.essential;
     const deviceUuid = ble_uuid || uuid;
     if (image_data != null && (typeof image_data !== 'string' || !/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*$/.test(image_data) || image_data.length > 650000)) {
       return r.status(400).json({ error: 'A foto precisa ser JPEG, PNG ou WebP e ter no máximo 450 KB.' });
@@ -60,7 +60,7 @@ app.post('/objects', auth, idempotenciaOffline, async (q, r) => {
         q.user.id,
         name.trim(),
         category || 'Outros',
-        !!isImportant,
+        !!essencialMarcado,
         image_data || null
       ]
     );
@@ -87,8 +87,8 @@ app.post('/objects', auth, idempotenciaOffline, async (q, r) => {
       id: x.insertId,
       name: name.trim(),
       category: category || 'Outros',
-      important: !!isImportant,
-      essential: !!isImportant,
+      important: !!essencialMarcado,
+      essential: !!essencialMarcado,
       image_data: image_data || null,
       ble_uuid: deviceUuid?.trim() || null,
       connected: false
@@ -479,16 +479,16 @@ app.post('/routine/location', auth, async (q, r) => {
     );
     if (jaSugerido) return r.json({ destination, items: [], ai: false, repeated: true });
     const objects = (await db.execute('SELECT name,category,important FROM objects WHERE user_id=? ORDER BY important DESC,name LIMIT 80', [q.user.id]))[0];
-    let registeredItems = registeredSuggestions(destination, objects).map(item => item.name);
+    let objetosRelacionados = sugerirObjetosRelacionados(destination, objects).map(item => item.name);
     const nomesCadastrados = new Set(objects.map(item => String(item.name).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim()));
-    let items = [...new Set(suggestions(destination, objects))].filter(item => !nomesCadastrados.has(String(item).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim())).slice(0, 8);
+    let items = [...new Set(sugerirItensDestino(destination, objects))].filter(item => !nomesCadastrados.has(String(item).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR').trim())).slice(0, 8);
     let ai = false;
     if (String(process.env.GEMINI_API_KEY || '').trim()) {
-      try { const sugestões = await gerarSugestoesGemini(destination, objects); items = sugestões.items; registeredItems = sugestões.registeredItems; ai = true; }
+      try { const sugestões = await gerarSugestoesGemini(destination, objects); items = sugestões.items; objetosRelacionados = sugestões.objetosRelacionados; ai = true; }
       catch (error) { console.error('Sugestão GPS Gemini indisponível:', error.message); }
     }
     await db.execute('UPDATE routine_location_visits SET last_suggested_at=NOW() WHERE user_id=? AND destination_hash=?', [q.user.id, destinationHash]);
-    r.json({ destination, items, registeredItems, ai, repeated: false });
+    r.json({ destination, items, objetosRelacionados, ai, repeated: false });
   } catch (error) {
     r.status(502).json({ error: error.message || 'Não consegui analisar o local detectado.' });
   }

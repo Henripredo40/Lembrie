@@ -8,7 +8,7 @@ import CartaoObjeto from '../componentes/CartaoObjeto';
 import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, Botao, CampoTexto, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
-import { categoriasDeObjeto, criarDadosObjeto, filtrarObjetos, normalizarTexto, objetoÉEssencial, obterCategoriasDisponiveis } from '../utils/objetos';
+import { categoriasDeObjeto, criarDadosObjeto, filtrarObjetos, normalizarTexto, objetoÉEssencial, obterCategoriasDisponiveis } from '../utilitarios/objetos';
 
 const CATEGORIA_PERSONALIZADA = '__personalizada__';
 type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string; image_data?: string | null } };

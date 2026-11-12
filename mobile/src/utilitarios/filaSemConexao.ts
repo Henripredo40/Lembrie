@@ -1,9 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
-import { aplicarOperacoesPendentes, caminhosComCacheOffline as caminhosEmCache, podeEnfileirar, podeSalvarPerfilOffline, type OperacaoOffline } from './filaOfflineLogica';
+import { aplicarAlteracoesPendentes, rotasComCacheLocal as caminhosEmCache, podeEntrarNaFila, podeSalvarPerfilSemConexao, type AlteracaoPendente } from './regrasFilaSemConexao';
 
 type Armazenamento = Pick<typeof AsyncStorage, 'getItem' | 'setItem'>;
-export class FilaOffline {
+export class FilaSemConexao {
   private escopo: string | null = null;
 
   constructor(
@@ -34,7 +34,7 @@ export class FilaOffline {
     } catch { return path; }
   }
 
-  private async lerFila(): Promise<OperacaoOffline[]> {
+  private async lerFila(): Promise<AlteracaoPendente[]> {
     const chave = this.chave('fila', 'api');
     if (!chave) return [];
     try { return JSON.parse(await this.armazenamento.getItem(chave) || '[]'); } catch { return []; }
@@ -42,13 +42,13 @@ export class FilaOffline {
 
   async quantidadePendente() { return (await this.lerFila()).length; }
 
-  async podeEnfileirar(method: string, path: string, body: any) {
-    if (!podeEnfileirar(method, path)) return false;
+  async podeEntrarNaFila(method: string, path: string, body: any) {
+    if (!podeEntrarNaFila(method, path)) return false;
     if (method !== 'PATCH' || path !== '/me') return true;
     const perfil = await this.armazenamento.getItem(this.chave('cache', '/me')!);
     if (!perfil) return false;
     try {
-      return podeSalvarPerfilOffline(body, JSON.parse(perfil));
+      return podeSalvarPerfilSemConexao(body, JSON.parse(perfil));
     } catch { return false; }
   }
 
@@ -56,14 +56,14 @@ export class FilaOffline {
     if (!this.escopo || !caminhosEmCache.has(path)) return undefined;
     try {
       const valor = await this.armazenamento.getItem(this.chave('cache', path)!);
-      return valor == null ? undefined : aplicarOperacoesPendentes(path, JSON.parse(valor), await this.lerFila());
+      return valor == null ? undefined : aplicarAlteracoesPendentes(path, JSON.parse(valor), await this.lerFila());
     } catch { return undefined; }
   }
 
   async guardarCache(path: string, dados: any) {
     const chave = this.chave('cache', path);
     if (chave && caminhosEmCache.has(path)) await this.armazenamento.setItem(chave, JSON.stringify(dados)).catch(() => {});
-    return aplicarOperacoesPendentes(path, dados, await this.lerFila());
+    return aplicarAlteracoesPendentes(path, dados, await this.lerFila());
   }
 
   async guardarAlteracaoConfirmada(method: string, path: string, body: any, resposta: any) {
@@ -77,18 +77,18 @@ export class FilaOffline {
     if (!chave) return;
     const salvo = await this.armazenamento.getItem(chave);
     if (salvo == null) return;
-    const operação: OperacaoOffline = {
+    const operação: AlteracaoPendente = {
       id: Crypto.randomUUID(), localId: resposta?.id == null ? `local:${Crypto.randomUUID()}` : String(resposta.id),
       method, path, body, createdAt: new Date().toISOString(),
     };
     try {
-      const atualizado = aplicarOperacoesPendentes(coleção, JSON.parse(salvo), [operação]);
+      const atualizado = aplicarAlteracoesPendentes(coleção, JSON.parse(salvo), [operação]);
       await this.armazenamento.setItem(chave, JSON.stringify(atualizado));
     } catch {}
   }
 
   async enfileirar(method: string, path: string, body: any) {
-    if (!this.escopo || !await this.podeEnfileirar(method, path, body)) throw new Error('Esta ação precisa de conexão com o servidor.');
+    if (!this.escopo || !await this.podeEntrarNaFila(method, path, body)) throw new Error('Esta ação precisa de conexão com o servidor.');
     const id = Crypto.randomUUID();
     const localId = method === 'POST' ? `local:${Crypto.randomUUID()}` : undefined;
     const operacao = { id, localId, method, path, body, createdAt: new Date().toISOString() };
@@ -103,12 +103,12 @@ export class FilaOffline {
     return { operacao, resposta, quantidade: fila.length };
   }
 
-  private async gravarFila(fila: OperacaoOffline[]) {
+  private async gravarFila(fila: AlteracaoPendente[]) {
     const chave = this.chave('fila', 'api');
     if (chave) await this.armazenamento.setItem(chave, JSON.stringify(fila));
   }
 
-  private respostaOffline(operacao: OperacaoOffline) {
+  private respostaOffline(operacao: AlteracaoPendente) {
     if (operacao.path === '/objects' && operacao.method === 'POST') {
       const corpo = operacao.body || {};
       return { id: operacao.localId, name: corpo.name, category: corpo.category || 'Outros', important: Boolean(corpo.important ?? corpo.essential), essential: Boolean(corpo.important ?? corpo.essential), image_data: corpo.image_data || null, connected: false, ble_uuid: null };

@@ -5,7 +5,7 @@ import { Botao, CampoTexto } from '../componentes/Elementos';
 import GoogleRecuperacao from '../componentes/GoogleRecuperacao';
 import { cores } from '../tema';
 import estilos from '../estilos/TelaAutenticacao.estilos';
-import { codigoEmailValido, senhaTemTamanhoMinimo, senhasIguais } from '../utils/validacaoConta';
+import { codigoEmailValido, senhaTemTamanhoMinimo, senhasIguais } from '../utilitarios/validacaoConta';
 
 export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, recuperarSenhaGoogle, carregando }) {
   const [modoCadastro, setModoCadastro] = useState(false);

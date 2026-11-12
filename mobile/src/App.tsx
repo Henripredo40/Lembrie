@@ -4,14 +4,14 @@ import { ActivityIndicator, Alert, AppState, Linking, Modal, Platform, Pressable
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FilaOffline } from './utils/filaOffline';
+import { FilaSemConexao } from './utilitarios/filaSemConexao';
 import { criarClienteApi } from './servicos/clienteApi';
 import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TelaAutenticacao from './telas/TelaAutenticacao';
 import TelaInicio from './telas/TelaInicio';
 import TelaObjetos from './telas/TelaObjetos';
-import TelaBluetooth from './telas/TelaBluetooth';
+import TelaBluetooth, { encerrarConexaoLambrie, habilitarMonitoramentoLambrie, reativarMonitoramentoLambrie } from './telas/TelaBluetooth';
 import TelaSaida from './telas/TelaSaida';
 import TelaConfiguracoes from './telas/TelaConfiguracoes';
 import TelaHistorico from './telas/TelaHistorico';
@@ -64,7 +64,7 @@ export default function App() {
   const sessãoConta = useRef<string | null>(null);
   const [idSessãoConta, definirIdSessãoConta] = useState<string | null>(null);
   const localEnviadoNaSessão = useRef<string | null>(null);
-  const filaOffline = useRef(new FilaOffline()).current;
+  const filaSemConexao = useRef(new FilaSemConexao()).current;
   const sessaoMaisRecente = seguranca?.sessions?.[0];
   const dataUltimoLogin = seguranca?.last_login ? new Date(String(seguranca.last_login).replace(' ', 'T')) : null;
   const textoUltimoLogin = dataUltimoLogin && !Number.isNaN(dataUltimoLogin.getTime())
@@ -97,17 +97,26 @@ export default function App() {
 
   useEffect(() => {
     let ativo = true;
-    Promise.all([AsyncStorage.getItem('token'), filaOffline.carregarEscopo()])
+    Promise.all([AsyncStorage.getItem('token'), filaSemConexao.carregarEscopo()])
       .then(([valor]) => { if (ativo && valor) definirToken(valor); })
       .catch(() => {})
       .finally(() => { if (ativo) definirRestaurando(false); });
     return () => { ativo = false; };
-  }, [filaOffline]);
+  }, [filaSemConexao]);
 
   const chamarApi = useCallback(
-    criarClienteApi({ endereco: endereçoDaApi, token, filaOffline, aoAtualizarPendentes: definirOperaçõesPendentes }),
-    [token, filaOffline],
+    criarClienteApi({ endereco: endereçoDaApi, token, filaSemConexao, aoAtualizarPendentes: definirOperaçõesPendentes }),
+    [token, filaSemConexao],
   );
+
+  const idsChaveirosAssociados = objetos.filter((objeto) => objeto.ble_uuid).map((objeto) => String(objeto.id) + ':' + objeto.ble_uuid).join('|');
+  useEffect(() => {
+    if (!token || Platform.OS === 'web' || !idsChaveirosAssociados) return;
+    const primeiro = objetos.find((objeto) => objeto.ble_uuid);
+    if (primeiro) void reativarMonitoramentoLambrie(primeiro.ble_uuid, primeiro.id, chamarApi).then((conectado) => {
+      definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(primeiro.id) ? { ...item, connected: conectado } : item));
+    });
+  }, [token, idsChaveirosAssociados, chamarApi]);
 
   useEffect(() => {
     if (!token) return;
@@ -214,9 +223,9 @@ export default function App() {
     let ativo = true;
     let sincronizando = false;
     const sincronizar = async () => {
-      if (sincronizando || !await filaOffline.quantidadePendente()) return;
+      if (sincronizando || !await filaSemConexao.quantidadePendente()) return;
       sincronizando = true;
-      const resultado = await filaOffline.sincronizar(token, endereçoDaApi);
+      const resultado = await filaSemConexao.sincronizar(token, endereçoDaApi);
       if (ativo) {
         definirOperaçõesPendentes(resultado.pendentes);
         definirErroSincronização(resultado.erro || '');
@@ -228,7 +237,7 @@ export default function App() {
     const intervalo = setInterval(sincronizar, 15000);
     const inscrição = AppState.addEventListener('change', estado => { if (estado === 'active') void sincronizar(); });
     return () => { ativo = false; clearInterval(intervalo); inscrição.remove(); };
-  }, [token, filaOffline, carregarDados]);
+  }, [token, filaSemConexao, carregarDados]);
 
   function notificar(mensagem) {
     if (Platform.OS === 'web') {
@@ -241,8 +250,9 @@ export default function App() {
   }
 
   async function aceitarSessão(dados) {
+    habilitarMonitoramentoLambrie();
     await AsyncStorage.setItem('token', dados.token);
-    if (dados.user?.id != null) await filaOffline.definirEscopo(String(dados.user.id));
+    if (dados.user?.id != null) await filaSemConexao.definirEscopo(String(dados.user.id));
     if (dados.session_id) await AsyncStorage.setItem('account_session_id', String(dados.session_id));
     definirIdSessãoConta(dados.session_id ? String(dados.session_id) : null);
     definirToken(dados.token);
@@ -375,6 +385,7 @@ export default function App() {
   async function sairDaConta() {
     const confirmar = async () => {
       definirSaindo(true);
+      await encerrarConexaoLambrie();
       if (sessãoConta.current) await chamarApi('/sessions/end', { method: 'POST', body: JSON.stringify({ session_id: sessãoConta.current }) }).catch(() => {});
       sessãoConta.current = null;
       definirIdSessãoConta(null);

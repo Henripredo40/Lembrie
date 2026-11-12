@@ -1,4 +1,4 @@
-function suggestions(destination, objects = []) {
+function sugerirItensDestino(destination, objects = []) {
   const d = String(destination || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
   const rules: Array<[string, string[]]> = [
@@ -123,8 +123,8 @@ function sugestõesPorPerto(categorias = []) {
   return [...new Set(mapa.filter(([nomes]) => nomes.some(nome => relacionadas.has(nome))).flatMap(([, itens]) => itens))];
 }
 
-function registeredSuggestions(destination, objects, nearbyCategories = []) {
-  const candidateNames = [...suggestions(destination, []), ...sugestõesPorPerto(nearbyCategories)];
+function sugerirObjetosRelacionados(destination, objects, nearbyCategories = []) {
+  const candidateNames = [...sugerirItensDestino(destination, []), ...sugestõesPorPerto(nearbyCategories)];
   const normalize = value => String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -150,4 +150,4 @@ function registeredSuggestions(destination, objects, nearbyCategories = []) {
     }));
 }
 
-module.exports = { suggestions, sugestõesPorPerto, registeredSuggestions };
+module.exports = { sugerirItensDestino, sugestõesPorPerto, sugerirObjetosRelacionados };

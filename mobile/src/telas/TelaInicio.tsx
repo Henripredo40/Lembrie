@@ -6,7 +6,7 @@ import CartaoObjeto from '../componentes/CartaoObjeto';
 import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
-import { categoriasDeObjeto, chaveiroEstáConectado, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
+import { categoriasDeObjeto, chaveiroEstáConectado, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utilitarios/objetos';
 
 
 export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = true, mostrarAtalhosFlutuantes = true, compacto = false, objetos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {

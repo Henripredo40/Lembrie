@@ -1,21 +1,21 @@
-export type OperacaoOffline = { id: string; localId?: string; method: string; path: string; body: any; createdAt: string };
+export type AlteracaoPendente = { id: string; localId?: string; method: string; path: string; body: any; createdAt: string };
 
-export const caminhosComCacheOffline = new Set(['/objects', '/events', '/me', '/settings', '/exit-profiles', '/routine/plans']);
+export const rotasComCacheLocal = new Set(['/objects', '/events', '/me', '/settings', '/exit-profiles', '/routine/plans']);
 
-export function podeEnfileirar(method: string, path: string) {
+export function podeEntrarNaFila(method: string, path: string) {
   const rota = path.split('?')[0];
   return (method === 'POST' && ['/objects', '/events', '/exit-profiles', '/routine/plans'].includes(rota)) ||
     (method === 'PATCH' && (rota === '/settings' || rota === '/me' || /^\/objects\/[^/]+$/.test(rota))) ||
     (method === 'DELETE' && /^\/objects\/[^/]+$/.test(rota));
 }
 
-export function podeSalvarPerfilOffline(alteracao: any, perfil: any) {
+export function podeSalvarPerfilSemConexao(alteracao: any, perfil: any) {
   return Boolean(perfil?.email) &&
     String(perfil.email).toLowerCase() === String(alteracao?.email || '').toLowerCase() &&
     !alteracao?.email_verification_code;
 }
 
-export function aplicarOperacoesPendentes(path: string, dados: any, operacoes: OperacaoOffline[]) {
+export function aplicarAlteracoesPendentes(path: string, dados: any, operacoes: AlteracaoPendente[]) {
   const rota = path.split('?')[0];
   let resultado = Array.isArray(dados) ? [...dados] : dados && typeof dados === 'object' ? { ...dados } : dados;
   for (const operacao of operacoes) {

@@ -86,7 +86,7 @@ A interface usa textos de apoio mais legíveis, áreas maiores para ações freq
 
 ## Chaveiro Bluetooth
 
-O app busca dispositivos BLE, conecta, descobre os serviços e características anunciados e atualiza o estado da conexão na conta. O firmware ainda precisa definir os UUIDs usados pelo chaveiro, o formato do comando do alarme e as regras de detecção de afastamento para habilitar localização sonora e alertas automáticos. Bluetooth exige um build Android ou iOS com o módulo nativo; o Expo Go padrão não inclui react-native-ble-plx.
+O app busca dispositivos BLE, conecta, descobre os serviços e características anunciados, envia o resumo para a tela e oferece o comando **Localizar chaveiro**, tentando reconectar ao dispositivo associado. Após conectar, arma no firmware um alerta sonoro acionado quando a conexão BLE se perde; o usuário pode desarmá-lo ao desconectar manualmente. O alerta usa a perda de conexão como indicação de afastamento, não mede distância em metros. A placa Spotpear precisa de um buzzer ativo externo de 3,3 V ligado ao GPIO6 conforme `firmware/esp32c3_lambrie/README.md`. Bluetooth exige um build Android ou iOS com o módulo nativo; o Expo Go padrão não inclui react-native-ble-plx.
 
 ## Organização do código
 
@@ -94,15 +94,15 @@ O app busca dispositivos BLE, conecta, descobre os serviços e características 
 - mobile/src/telas/: uma tela TypeScript por arquivo.
 - mobile/src/estilos/: estilos TypeScript das telas e dos componentes.
 - mobile/src/componentes/: componentes TypeScript, campos, botões, ilustrações e `MapaLibre.web.tsx`/`MapaLibre.native.tsx`.
-- mobile/src/utils/: utilitários TypeScript, categorias, imagens locais e datas.
+- mobile/src/utilitarios/: utilitários TypeScript, categorias, imagens locais e datas.
 - server/src/server.ts: configuração HTTP e composição das rotas.
 - server/src/rotas/: endpoints separados por conta, objetos/rotina, planejamento/assistente e lugares.
 - server/src/servicos/: regras de sugestões e formatação de lugares.
 - server/src/middleware/: autenticação das requisições.
 - server/src/config/banco.ts e iniciarBanco.ts: conexão e inicialização/migração do MySQL.
-- mobile/src/utils/filaOffline.ts: cache local e envio posterior de alterações.
+- mobile/src/utilitarios/filaSemConexao.ts: cache local e envio posterior de alterações.
 - docker-compose.yml e server/Dockerfile: ambiente local reproduzível para API e MySQL.
-- server/src/servicos/\*.test.ts e mobile/src/utils/filaOfflineLogica.test.ts: testes unitários sem depender do banco ou da rede.
+- server/src/servicos/\*.test.ts e mobile/src/utilitarios/regrasFilaSemConexao.test.ts: testes unitários sem depender do banco ou da rede.
 - server/sql/schema.sql: estrutura inicial do MySQL.
 
 ### Qualidade e referência às normas ISO

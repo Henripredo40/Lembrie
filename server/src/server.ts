@@ -16,10 +16,10 @@ const initializeDatabase = require('./config/iniciarBanco');
 
 const app = express();
 
-const registerAccountRoutes = require('./rotas/conta');
-const registerInventoryRoutes = require('./rotas/objetos');
-const registerPlanningRoutes = require('./rotas/planejamento');
-const registerPlacesRoutes = require('./rotas/lugares');
+const registrarRotasDaConta = require('./rotas/conta');
+const registrarRotasDeObjetos = require('./rotas/objetos');
+const registrarRotasDePlanejamento = require('./rotas/planejamento');
+const registrarRotasDeLugares = require('./rotas/lugares');
 
 
 const producao = process.env.NODE_ENV === 'production';
@@ -98,15 +98,15 @@ async function enviarEmail({ to, subject, text }) {
   });
 }
 
-const { suggestions, sugestõesPorPerto, registeredSuggestions } = require('./servicos/sugestoes');
+const { sugerirItensDestino, sugestõesPorPerto, sugerirObjetosRelacionados } = require('./servicos/sugestoes');
 
 const { formatarResultadoLugar, pontuarCorrespondenciaBusca } = require('./servicos/lugares');
 
-const contextoDasRotas = { app, auth, idempotenciaOffline, db, bcrypt, jwt, crypto, OAuth2Client, secret, validarEmail, resumirHash, rotuloDispositivo, criarSessaoConta, emailConfigurado, enviarEmail, suggestions, sugestõesPorPerto, registeredSuggestions, formatarResultadoLugar, pontuarCorrespondenciaBusca, estadoDosMapas };
-registerAccountRoutes(contextoDasRotas);
-const { gerarSugestoesGemini } = registerPlanningRoutes(contextoDasRotas);
-registerInventoryRoutes({ ...contextoDasRotas, gerarSugestoesGemini });
-registerPlacesRoutes(contextoDasRotas);
+const contextoDasRotas = { app, auth, idempotenciaOffline, db, bcrypt, jwt, crypto, OAuth2Client, secret, validarEmail, resumirHash, rotuloDispositivo, criarSessaoConta, emailConfigurado, enviarEmail, sugerirItensDestino, sugestõesPorPerto, sugerirObjetosRelacionados, formatarResultadoLugar, pontuarCorrespondenciaBusca, estadoDosMapas };
+registrarRotasDaConta(contextoDasRotas);
+const { gerarSugestoesGemini } = registrarRotasDePlanejamento(contextoDasRotas);
+registrarRotasDeObjetos({ ...contextoDasRotas, gerarSugestoesGemini });
+registrarRotasDeLugares(contextoDasRotas);
 
 app.get('/', (_q, r, next) => {
   const index = path.join(diretorioWeb, 'index.html');

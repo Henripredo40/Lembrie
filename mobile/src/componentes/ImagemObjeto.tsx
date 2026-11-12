@@ -1,7 +1,7 @@
 import React from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image, View } from 'react-native';
-import { obterDesenhoDoObjeto } from '../utils/objetos';
+import { obterDesenhoDoObjeto } from '../utilitarios/objetos';
 import styles from '../estilos/ImagemObjeto.estilos';
 
 export default function ImagemObjeto({ nome, categoria, tamanho = 30, compacto = false, imagemUri }: { nome?: string; categoria?: string; tamanho?: number; compacto?: boolean; imagemUri?: string | null }) {

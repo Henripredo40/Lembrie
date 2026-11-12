@@ -17,10 +17,18 @@ function codificarBase64(bytes: number[]) {
 }
 
 export function criarPacotesResumoLambrie(resumo: ResumoSaidaBluetooth, tamanhoPacote = 18) {
-  const json = JSON.stringify({
+  return criarPacotesMensagemLambrie({
     destination: resumo.destination || 'Saida',
     items: resumo.items.join(', ') || 'Todos os essenciais conferidos',
-  }) + '\n';
+  }, tamanhoPacote);
+}
+
+export function criarPacotesComandoLambrie(command: 'arm' | 'disarm' | 'locate', tamanhoPacote = 18) {
+  return criarPacotesMensagemLambrie({ command }, tamanhoPacote);
+}
+
+function criarPacotesMensagemLambrie(mensagem: Record<string, string>, tamanhoPacote: number) {
+  const json = JSON.stringify(mensagem) + '\n';
   const bytes = Array.from(unescape(encodeURIComponent(json)), (caractere) => caractere.charCodeAt(0));
   const pacotes: string[] = [];
   for (let início = 0; início < bytes.length; início += tamanhoPacote) {

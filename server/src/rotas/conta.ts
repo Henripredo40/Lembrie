@@ -1,4 +1,4 @@
-module.exports = function registerAccountRoutes({ app, auth, idempotenciaOffline, db, bcrypt, jwt, crypto, OAuth2Client, secret, validarEmail, resumirHash, criarSessaoConta, emailConfigurado, enviarEmail, formatarResultadoLugar, estadoDosMapas }) {
+module.exports = function registrarRotasDaConta({ app, auth, idempotenciaOffline, db, bcrypt, jwt, crypto, OAuth2Client, secret, validarEmail, resumirHash, criarSessaoConta, emailConfigurado, enviarEmail, formatarResultadoLugar, estadoDosMapas }) {
 app.get('/health', async (_q, r) => {
   try {
     await db.query('SELECT 1');

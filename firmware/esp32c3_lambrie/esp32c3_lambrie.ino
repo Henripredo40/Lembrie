@@ -17,10 +17,51 @@ static const char *SERVICE_UUID = "6f6d0001-7a52-4f6c-9a21-4c454d425249";
 static const char *DATA_UUID    = "6f6d0002-7a52-4f6c-9a21-4c454d425249";
 static const char *DEVICE_NAME  = "Lambrie ESP32C3";
 static const size_t MAX_MESSAGE = 480;
+// O buzzer não vem integrado nesta placa; use um módulo ativo de 3,3 V no GPIO6.
+static const int BUZZER_PIN = 6;
 
 Adafruit_ST7735 tft(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 String receivedMessage;
 bool messageReady = false;
+volatile bool alertaAfastamentoArmado = false;
+volatile bool solicitarAlertaAfastamento = false;
+volatile bool solicitarLocalizacao = false;
+volatile bool conexãoBleAtiva = false;
+volatile unsigned long instanteDesconexão = 0;
+bool somAtivo = false;
+bool buzzerLigado = false;
+int pulsosRestantes = 0;
+unsigned int tempoLigadoMs = 0;
+unsigned int tempoDesligadoMs = 0;
+unsigned long proximaEtapaSom = 0;
+
+void iniciarSom(int pulsos, unsigned int ligadoMs, unsigned int desligadoMs) {
+  pulsosRestantes = pulsos;
+  tempoLigadoMs = ligadoMs;
+  tempoDesligadoMs = desligadoMs;
+  somAtivo = pulsos > 0;
+  buzzerLigado = somAtivo;
+  digitalWrite(BUZZER_PIN, buzzerLigado ? HIGH : LOW);
+  proximaEtapaSom = millis() + tempoLigadoMs;
+}
+
+void atualizarSom() {
+  if (!somAtivo || millis() < proximaEtapaSom) return;
+  if (buzzerLigado) {
+    digitalWrite(BUZZER_PIN, LOW);
+    buzzerLigado = false;
+    pulsosRestantes--;
+    if (pulsosRestantes <= 0) {
+      somAtivo = false;
+      return;
+    }
+    proximaEtapaSom = millis() + tempoDesligadoMs;
+  } else {
+    digitalWrite(BUZZER_PIN, HIGH);
+    buzzerLigado = true;
+    proximaEtapaSom = millis() + tempoLigadoMs;
+  }
+}
 
 class LambrieCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *characteristic) override {
@@ -35,6 +76,20 @@ class LambrieCallbacks : public BLECharacteristicCallbacks {
         receivedMessage = "";
       }
     }
+  }
+};
+
+class LambrieServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer *server) override {
+    conexãoBleAtiva = true;
+    solicitarAlertaAfastamento = false;
+  }
+
+  void onDisconnect(BLEServer *server) override {
+    conexãoBleAtiva = false;
+    instanteDesconexão = millis();
+    solicitarAlertaAfastamento = alertaAfastamentoArmado;
+    BLEDevice::startAdvertising();
   }
 };
 
@@ -83,12 +138,15 @@ void drawScreen(const String &destination, const String &items) {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
   tft.initR(INITR_144GREENTAB);
   tft.setRotation(0);
   drawScreen("Aguardando celular", "Conecte pelo app");
 
   BLEDevice::init(DEVICE_NAME);
   BLEServer *server = BLEDevice::createServer();
+  server->setCallbacks(new LambrieServerCallbacks());
   BLEService *service = server->createService(SERVICE_UUID);
   BLECharacteristic *data = service->createCharacteristic(
     DATA_UUID,
@@ -104,15 +162,42 @@ void setup() {
 }
 
 void loop() {
+  if (solicitarAlertaAfastamento && conexãoBleAtiva) {
+    solicitarAlertaAfastamento = false;
+  }
+  if (solicitarAlertaAfastamento && millis() - instanteDesconexão >= 1000) {
+    solicitarAlertaAfastamento = false;
+    if (alertaAfastamentoArmado && !conexãoBleAtiva) {
+      iniciarSom(6, 300, 250);
+      Serial.println("Conexao perdida: alerta sonoro de afastamento.");
+    }
+  }
+  if (solicitarLocalizacao) {
+    solicitarLocalizacao = false;
+    iniciarSom(3, 120, 120);
+    Serial.println("Comando localizar recebido.");
+  }
   if (messageReady) {
     messageReady = false;
     String json = receivedMessage;
     receivedMessage = "";
     String destination = jsonString(json, "destination");
     String items = jsonString(json, "items");
-    drawScreen(destination, items);
-    Serial.println("Resumo recebido do app:");
-    Serial.println(json);
+    String command = jsonString(json, "command");
+    if (command == "arm") {
+      alertaAfastamentoArmado = true;
+      Serial.println("Alerta de afastamento armado.");
+    } else if (command == "disarm") {
+      alertaAfastamentoArmado = false;
+      Serial.println("Alerta de afastamento desarmado.");
+    } else if (command == "locate") {
+      solicitarLocalizacao = true;
+    } else if (destination.length() || items.length()) {
+      drawScreen(destination, items);
+      Serial.println("Resumo recebido do app:");
+      Serial.println(json);
+    }
   }
+  atualizarSom();
   delay(20);
 }

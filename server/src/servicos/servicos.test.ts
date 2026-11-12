@@ -1,18 +1,18 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-const { suggestions, sugestõesPorPerto, registeredSuggestions } = require('./sugestoes');
+const { sugerirItensDestino, sugestõesPorPerto, sugerirObjetosRelacionados } = require('./sugestoes');
 const { formatarResultadoLugar, pontuarCorrespondenciaBusca } = require('./lugares');
 
 describe('serviços de sugestões', () => {
   it('sugere itens escolares sem duplicatas', () => {
-    const resultado = suggestions('Escola', []);
+    const resultado = sugerirItensDestino('Escola', []);
     assert.ok(resultado.includes('Mochila'));
     assert.equal(new Set(resultado).size, resultado.length);
   });
 
   it('inclui itens essenciais cadastrados primeiro', () => {
-    const resultado = suggestions('praia', [{ name: 'Remédio', important: true }]);
+    const resultado = sugerirItensDestino('praia', [{ name: 'Remédio', important: true }]);
     assert.equal(resultado[0], 'Remédio');
   });
 
@@ -21,7 +21,7 @@ describe('serviços de sugestões', () => {
   });
 
   it('filtra objetos cadastrados por importância e sugestão', () => {
-    const resultado = registeredSuggestions('trabalho', [
+    const resultado = sugerirObjetosRelacionados('trabalho', [
       { id: 1, name: 'Notebook', category: 'Eletrônicos' },
       { id: 2, name: 'Passaporte', category: 'Documentos', important: true },
       { id: 3, name: 'Vaso', category: 'Casa' },

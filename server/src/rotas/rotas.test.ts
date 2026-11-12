@@ -1,10 +1,10 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-const registerAccountRoutes = require('./conta');
-const registerInventoryRoutes = require('./objetos');
-const registerPlanningRoutes = require('./planejamento');
-const registerPlacesRoutes = require('./lugares');
+const registrarRotasDaConta = require('./conta');
+const registrarRotasDeObjetos = require('./objetos');
+const registrarRotasDePlanejamento = require('./planejamento');
+const registrarRotasDeLugares = require('./lugares');
 
 function createRouteHarness() {
   const routes = new Map<string, (...args: any[]) => unknown>();
@@ -18,11 +18,11 @@ function createRouteHarness() {
     bcrypt: {}, jwt: {}, crypto: require('node:crypto'), OAuth2Client: class {},
     secret: 'test-secret', validarEmail: () => true, resumirHash: () => 'hash',
     rotuloDispositivo: () => 'Teste', criarSessaoConta: async () => 'session',
-    emailConfigurado: () => false, enviarEmail: async () => {}, suggestions: () => [],
-    sugestõesPorPerto: () => [], registeredSuggestions: () => [],
+    emailConfigurado: () => false, enviarEmail: async () => {}, sugerirItensDestino: () => [],
+    sugestõesPorPerto: () => [], sugerirObjetosRelacionados: () => [],
     formatarResultadoLugar: () => ({}), pontuarCorrespondenciaBusca: () => ({}),
     estadoDosMapas: { cache: new Map(), ultimoPedido: 0, fila: Promise.resolve() },
-    gerarSugestoesGemini: async () => ({ items: [], registeredItems: [] }),
+    gerarSugestoesGemini: async () => ({ items: [], objetosRelacionados: [] }),
   };
   return { routes, context };
 }
@@ -30,10 +30,10 @@ function createRouteHarness() {
 describe('módulos de rotas da API', () => {
   it('registra endpoints separados por domínio', () => {
     const { routes, context } = createRouteHarness();
-    registerAccountRoutes(context);
-    const serviçosDePlanejamento = registerPlanningRoutes(context);
-    registerInventoryRoutes({ ...context, ...serviçosDePlanejamento });
-    registerPlacesRoutes(context);
+    registrarRotasDaConta(context);
+    const serviçosDePlanejamento = registrarRotasDePlanejamento(context);
+    registrarRotasDeObjetos({ ...context, ...serviçosDePlanejamento });
+    registrarRotasDeLugares(context);
 
     for (const endpoint of [
       'GET /health', 'POST /auth/register', 'GET /me',
@@ -45,7 +45,7 @@ describe('módulos de rotas da API', () => {
 
   it('responde que a API está saudável quando o banco responde', async () => {
     const { routes, context } = createRouteHarness();
-    registerAccountRoutes(context);
+    registrarRotasDaConta(context);
     let código = 200;
     let corpo: unknown;
     const resposta = {

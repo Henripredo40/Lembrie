@@ -5,19 +5,86 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import { Aviso, Botao, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
-import { objetoTemChaveiro } from '../utils/objetos';
-import { lerResumoSaidaBluetooth } from '../utils/resumoSaidaBluetooth';
-import { criarPacotesResumoLambrie } from '../utils/protocoloLambrie';
+import { objetoTemChaveiro } from '../utilitarios/objetos';
+import { lerResumoSaidaBluetooth } from '../utilitarios/resumoSaidaBluetooth';
+import { criarPacotesComandoLambrie, criarPacotesResumoLambrie } from '../utilitarios/protocoloLambrie';
 
 const SERVIÇO_LEMBRIE = '6f6d0001-7a52-4f6c-9a21-4c454d425249';
 const CARACTERÍSTICA_LEMBRIE = '6f6d0002-7a52-4f6c-9a21-4c454d425249';
 let ConstrutorBluetooth = null;
+let gerenteBluetoothCompartilhado = null;
+let conexãoLambrieCompartilhada = null;
+let monitoramentoDesativado = false;
 if (Platform.OS !== 'web') {
   try {
     ConstrutorBluetooth = require('react-native-ble-plx').BleManager;
   } catch (erro) {
     ConstrutorBluetooth = null;
   }
+}
+
+async function enviarComandoLambrie(dispositivo, comando) {
+  for (const pacote of criarPacotesComandoLambrie(comando)) {
+    await dispositivo.writeCharacteristicWithResponseForService(SERVIÇO_LEMBRIE, CARACTERÍSTICA_LEMBRIE, pacote);
+  }
+}
+
+function aguardar(ms) {
+  return new Promise((resolver) => setTimeout(resolver, ms));
+}
+
+export async function encerrarConexaoLambrie() {
+  monitoramentoDesativado = true;
+  const conexão = conexãoLambrieCompartilhada;
+  const gerente = gerenteBluetoothCompartilhado;
+  if (!conexão || !gerente) return;
+  try {
+    const dispositivo = (await gerente.devices([conexão.id]))[0] || await gerente.connectToDevice(conexão.id, { timeout: 5000 });
+    await dispositivo.discoverAllServicesAndCharacteristics();
+    await enviarComandoLambrie(dispositivo, 'disarm');
+    await aguardar(150);
+  } catch (falha) {
+    // Se o dispositivo já estiver fora de alcance, a conexão será encerrada abaixo.
+  }
+  await gerente.cancelDeviceConnection(conexão.id).catch(() => {});
+  conexãoLambrieCompartilhada = null;
+}
+
+export async function reativarMonitoramentoLambrie(id, objetoId, api) {
+  if (Platform.OS === 'web' || !id || monitoramentoDesativado || !ConstrutorBluetooth) return false;
+  try {
+    if (Platform.OS === 'android' && Number(Platform.Version) >= 31) {
+      const permissões = await PermissionsAndroid.requestMultiple([
+        'android.permission.BLUETOOTH_SCAN',
+        'android.permission.BLUETOOTH_CONNECT',
+      ]);
+      if (Object.values(permissões).some((resultado) => resultado !== PermissionsAndroid.RESULTS.GRANTED)) {
+        await api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: false }) }).catch(() => {});
+        return false;
+      }
+    }
+    const gerente = gerenteBluetoothCompartilhado || new ConstrutorBluetooth();
+    gerenteBluetoothCompartilhado = gerente;
+    const conectados = await gerente.connectedDevices([SERVIÇO_LEMBRIE]);
+    if (conexãoLambrieCompartilhada?.id === id && conectados.some((dispositivo) => dispositivo.id === id)) {
+      await api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: true }) }).catch(() => {});
+      return true;
+    }
+    const dispositivoConectado = conectados.find((dispositivo) => dispositivo.id === id);
+    const dispositivo = dispositivoConectado || await gerente.connectToDevice(id, { timeout: 10000 });
+    await dispositivo.discoverAllServicesAndCharacteristics();
+    await enviarComandoLambrie(dispositivo, 'arm');
+    conexãoLambrieCompartilhada = { id, objetoId };
+    await api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: true }) }).catch(() => {});
+    return true;
+  } catch (falha) {
+    await api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: false }) }).catch(() => {});
+    return false;
+  }
+}
+
+export function habilitarMonitoramentoLambrie() {
+  monitoramentoDesativado = false;
 }
 
 export default function TelaBluetooth({ objetos, definirObjetos, api, notificar, abrirObjetos, lerResumo = lerResumoSaidaBluetooth }) {
@@ -36,6 +103,8 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
   const [conectando, setConectando] = useState(false);
   const [diagnostico, setDiagnostico] = useState(null);
   const [enviandoResumo, setEnviandoResumo] = useState(false);
+  const [localizando, setLocalizando] = useState(false);
+  const componenteAtivo = useRef(false);
 
   useEffect(() => {
     if (objetos.length && !objetos.some((objeto) => String(objeto.id) === String(objetoEscolhido))) {
@@ -52,23 +121,52 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     }
 
     try {
-      const novoGerente = new ConstrutorBluetooth();
+      const novoGerente = gerenteBluetoothCompartilhado || new ConstrutorBluetooth();
+      gerenteBluetoothCompartilhado = novoGerente;
       gerente.current = novoGerente;
       const inscrição = novoGerente.onStateChange((estado) => setEstadoBluetooth(estado), true);
+      componenteAtivo.current = true;
+      void (async () => {
+        try {
+          const conectados = await novoGerente.connectedDevices([SERVIÇO_LEMBRIE]);
+          const conexãoSalva = conexãoLambrieCompartilhada;
+          if (!conexãoSalva || !conectados.some((dispositivo) => dispositivo.id === conexãoSalva.id)) {
+            if (conexãoSalva) {
+              conexãoLambrieCompartilhada = null;
+              conexãoAtual.current = null;
+              definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(conexãoSalva.objetoId) ? { ...item, connected: false } : item));
+              api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: conexãoSalva.id, connected: false }) }).catch(() => {});
+            }
+            return;
+          }
+          conexãoAtual.current = conexãoSalva;
+          definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(conexãoSalva.objetoId) ? { ...item, connected: true } : item));
+          await acompanharDesconexão(conexãoSalva.id, conexãoSalva.objetoId);
+          const dispositivo = conectados.find((item) => item.id === conexãoSalva.id);
+          if (!dispositivo) return;
+          await dispositivo.discoverAllServicesAndCharacteristics();
+          const serviços = await dispositivo.services();
+          setDiagnostico({ nome: dispositivo.name || 'Lambrie ESP32C3', serviços: await Promise.all((serviços || []).map(async (serviço) => ({
+            uuid: serviço.uuid,
+            características: (await dispositivo.characteristicsForService(serviço.uuid)).map((característica) => ({
+              uuid: característica.uuid,
+              leitura: característica.isReadable,
+              escrita: característica.isWritableWithResponse || característica.isWritableWithoutResponse,
+              notificação: característica.isNotifiable || característica.isIndicatable,
+            })),
+          }))) });
+        } catch (falha) {}
+      })();
       return () => {
+        componenteAtivo.current = false;
         if (temporizador.current) clearTimeout(temporizador.current);
         if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
         try { novoGerente.stopDeviceScan(); } catch (falha) {}
         inscriçãoDesconexão.current?.remove();
-        if (conexãoAtual.current) {
-          const conexão = conexãoAtual.current;
-          api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: conexão.id, connected: false }) }).catch(() => {});
-          novoGerente.cancelDeviceConnection(conexão.id).catch(() => {});
-          conexãoAtual.current = null;
-        }
+        inscriçãoDesconexão.current = null;
         inscrição.remove();
-        novoGerente.destroy();
-        gerente.current = null;
+        // Mantém a conexão BLE durante a navegação no app para que o chaveiro
+        // possa detectar uma perda real de proximidade, sem alertar ao trocar de tela.
       };
     } catch (falha) {
       setEstadoBluetooth('Indisponível');
@@ -87,6 +185,22 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       resultado?.catch?.(() => {});
     } catch (falha) {}
     setProcurando(false);
+  }
+
+  async function acompanharDesconexão(id, objetoId) {
+    inscriçãoDesconexão.current?.remove();
+    inscriçãoDesconexão.current = gerente.current.onDeviceDisconnected(id, () => {
+      if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
+      temporizadorSinal.current = null;
+      conexãoAtual.current = null;
+      if (conexãoLambrieCompartilhada?.id === id) conexãoLambrieCompartilhada = null;
+      if (componenteAtivo.current) {
+        setDiagnostico(null);
+        definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(objetoId) ? { ...item, connected: false } : item));
+        setErro('A conexão do chaveiro foi perdida. Se o buzzer estiver instalado, ele emitirá o alerta. Aproxime o dispositivo e toque em “Localizar chaveiro” para reconectar.');
+      }
+      api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: false }) }).catch(() => {});
+    });
   }
 
   async function pedirPermissões() {
@@ -164,6 +278,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     setConectando(true);
     setErro('');
     try {
+      monitoramentoDesativado = false;
       pararBusca();
       const conectado = await gerente.current.connectToDevice(dispositivoEscolhido.id, { timeout: 12000 });
       await conectado.discoverAllServicesAndCharacteristics();
@@ -185,20 +300,14 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
         body: JSON.stringify({ ble_uuid: dispositivoEscolhido.id }),
       });
       conexãoAtual.current = { id: dispositivoEscolhido.id, objetoId: objeto.id };
+      conexãoLambrieCompartilhada = conexãoAtual.current;
       setDiagnostico({ nome: dispositivoEscolhido.nome, serviços: listaServiços });
       await api('/devices/heartbeat', {
         method: 'POST',
         body: JSON.stringify({ ble_uuid: dispositivoEscolhido.id, connected: true, rssi: dispositivoEscolhido.sinal }),
       });
-      inscriçãoDesconexão.current?.remove();
-      inscriçãoDesconexão.current = gerente.current.onDeviceDisconnected(dispositivoEscolhido.id, () => {
-        if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
-        temporizadorSinal.current = null;
-        conexãoAtual.current = null;
-        setDiagnostico(null);
-        definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(objeto.id) ? { ...item, connected: false } : item));
-        api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: dispositivoEscolhido.id, connected: false }) }).catch(() => {});
-      });
+      await enviarComandoLambrie(conectado, 'arm');
+      await acompanharDesconexão(dispositivoEscolhido.id, objeto.id);
       if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
       temporizadorSinal.current = setInterval(async () => {
         try {
@@ -217,7 +326,14 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       escolherDispositivo(null);
       notificar('Dispositivo conectado e associado a “' + objeto.name + '”. Os serviços e recursos Bluetooth foram identificados.');
     } catch (falha) {
-      if (dispositivoEscolhido?.id) gerente.current?.cancelDeviceConnection(dispositivoEscolhido.id).catch(() => {});
+      if (dispositivoEscolhido?.id && gerente.current) {
+        const dispositivo = (await gerente.current.devices([dispositivoEscolhido.id]).catch(() => []))[0];
+        if (dispositivo) {
+          await enviarComandoLambrie(dispositivo, 'disarm').catch(() => {});
+          await aguardar(150);
+        }
+        gerente.current.cancelDeviceConnection(dispositivoEscolhido.id).catch(() => {});
+      }
       setErro(falha.message || 'Não foi possível associar esse dispositivo.');
     } finally {
       setVinculando(false);
@@ -229,6 +345,11 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     const id = objeto.ble_uuid;
     if (!id || !gerente.current) return;
     try {
+      const dispositivo = (await gerente.current.devices([id]))[0] || await gerente.current.connectToDevice(id);
+      await dispositivo.discoverAllServicesAndCharacteristics();
+      await enviarComandoLambrie(dispositivo, 'disarm');
+      await aguardar(150);
+      monitoramentoDesativado = true;
       inscriçãoDesconexão.current?.remove();
       inscriçãoDesconexão.current = null;
       if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
@@ -236,10 +357,68 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       await gerente.current.cancelDeviceConnection(id);
       await api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: false }) });
       conexãoAtual.current = null;
+      conexãoLambrieCompartilhada = null;
       setDiagnostico(null);
       definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(objeto.id) ? { ...item, connected: false } : item));
     } catch (falha) {
       notificar(falha.message || 'Não foi possível desconectar o dispositivo.');
+    }
+  }
+
+  async function localizarChaveiro(objetoAlvo = null) {
+    const objeto = objetoAlvo || associados.find((item) => conexãoAtual.current?.id === item.ble_uuid) || associados[0];
+    const id = objeto?.ble_uuid || (objeto?.id === conexãoAtual.current?.objetoId ? conexãoAtual.current.id : null);
+    const gerenteAtual = gerente.current || gerenteBluetoothCompartilhado;
+    if (!id || !objeto || !gerenteAtual) {
+      setErro('Associe primeiro um chaveiro Bluetooth ao objeto que deseja localizar.');
+      return;
+    }
+    setLocalizando(true);
+    setErro('');
+    try {
+      const autorizado = await pedirPermissões();
+      if (!autorizado) return;
+      if (conexãoAtual.current && conexãoAtual.current.id !== id) {
+        const anterior = (await gerenteAtual.devices([conexãoAtual.current.id]))[0];
+        if (anterior) {
+          await anterior.discoverAllServicesAndCharacteristics();
+          await enviarComandoLambrie(anterior, 'disarm').catch(() => {});
+          await aguardar(150);
+        }
+        inscriçãoDesconexão.current?.remove();
+        if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
+        await gerenteAtual.cancelDeviceConnection(conexãoAtual.current.id).catch(() => {});
+        conexãoAtual.current = null;
+        conexãoLambrieCompartilhada = null;
+      }
+      const conectados = await gerenteAtual.connectedDevices([SERVIÇO_LEMBRIE]);
+      const dispositivo = conectados.find((item) => item.id === id) || await gerenteAtual.connectToDevice(id, { timeout: 10000 });
+      await dispositivo.discoverAllServicesAndCharacteristics();
+      if (!conexãoAtual.current || conexãoAtual.current.id !== id) {
+        await enviarComandoLambrie(dispositivo, 'arm');
+        conexãoAtual.current = { id, objetoId: objeto.id };
+        conexãoLambrieCompartilhada = conexãoAtual.current;
+        monitoramentoDesativado = false;
+        await acompanharDesconexão(id, objeto.id);
+        definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(objeto.id) ? { ...item, connected: true } : item));
+        await api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: true }) }).catch(() => {});
+      }
+      await enviarComandoLambrie(dispositivo, 'locate');
+      const serviços = await dispositivo.services();
+      setDiagnostico({ nome: dispositivo.name || 'Lambrie ESP32C3', serviços: await Promise.all((serviços || []).map(async (serviço) => ({
+        uuid: serviço.uuid,
+        características: (await dispositivo.characteristicsForService(serviço.uuid)).map((característica) => ({
+          uuid: característica.uuid,
+          leitura: característica.isReadable,
+          escrita: característica.isWritableWithResponse || característica.isWritableWithoutResponse,
+          notificação: característica.isNotifiable || característica.isIndicatable,
+        })),
+      }))) });
+      notificar('Comando de localização enviado. O chaveiro emitirá um som.');
+    } catch (falha) {
+      setErro(falha.message || 'Não foi possível localizar o chaveiro. Confira se ele está conectado e próximo.');
+    } finally {
+      setLocalizando(false);
     }
   }
 
@@ -279,11 +458,19 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
         body: JSON.stringify({ ble_uuid: null }),
       });
       if (conexãoAtual.current?.id === objeto.ble_uuid) {
+        monitoramentoDesativado = true;
+        const dispositivo = (await gerente.current?.devices([objeto.ble_uuid]) || [])[0];
+        if (dispositivo && gerente.current) {
+          await dispositivo.discoverAllServicesAndCharacteristics();
+          await enviarComandoLambrie(dispositivo, 'disarm');
+          await aguardar(150);
+        }
         inscriçãoDesconexão.current?.remove();
         if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
         temporizadorSinal.current = null;
         await gerente.current?.cancelDeviceConnection(objeto.ble_uuid).catch(() => {});
         conexãoAtual.current = null;
+        conexãoLambrieCompartilhada = null;
         setDiagnostico(null);
       }
       definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(objeto.id)
@@ -302,7 +489,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo}>
       <Text style={estilos.sobretitulo}>CHAVEIRO</Text>
       <Text style={estilos.titulo}>Bluetooth</Text>
-      <Text style={estilos.subtitulo}>Associe um chaveiro Bluetooth compatível para habilitar a detecção por proximidade e os alertas de separação.</Text>
+      <Text style={estilos.subtitulo}>Receba um aviso sonoro quando a conexão BLE se perder e toque para localizar o chaveiro quando ele estiver por perto.</Text>
 
       {Platform.OS === 'web' ? (
         <EstadoVazio ícone="phone-portrait-outline" título="Use o aplicativo Android para buscar" texto="A busca Bluetooth precisa das permissões nativas do celular. No site, você pode organizar os objetos; para encontrar dispositivos, use o APK Android." />
@@ -319,7 +506,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
 
           <View style={estilos.cartaoAviso}>
             <View style={estilos.cabecalhoAviso}><Ionicons name="construct-outline" size={19} color={cores.primario} /><Text style={estilos.tituloAviso}>Como conectar</Text></View>
-            <Text style={estilos.textoAviso}>Sem chaveiro, você ainda pode organizar objetos e conferir sua lista manualmente. Para usar o acompanhamento por Bluetooth, é necessário um chaveiro compatível, ligado e associado ao objeto.</Text>
+            <Text style={estilos.textoAviso}>Sem chaveiro, você ainda pode organizar objetos e conferir sua lista manualmente. Os sons precisam de um buzzer externo instalado na ESP32-C3; veja as instruções do firmware.</Text>
           </View>
 
           {objetos.length ? (
@@ -392,6 +579,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
                 <View key={String(objeto.id)} style={estilos.itemAssociado}>
                   <CartaoObjeto objeto={objeto} compacto />
                   {objeto.connected ? <Text style={estilos.statusConectado}>Bluetooth conectado</Text> : <Text style={estilos.statusDesconectado}>Bluetooth desconectado</Text>}
+                  <Botao título={localizando ? 'Conectando para localizar...' : 'Localizar chaveiro'} ícone="volume-high-outline" aoPressionar={() => localizarChaveiro(objeto)} carregando={localizando} estilo={{ marginTop: 10 }} />
                   {objeto.connected ? <Pressable accessibilityRole="button" onPress={() => desconectarDispositivo(objeto)} style={estilos.removerVinculo}><Ionicons name="bluetooth-outline" size={16} color={cores.primario} /><Text style={[estilos.textoRemoverVinculo, { color: cores.primario }]}>Desconectar</Text></Pressable> : null}
                   <Pressable accessibilityRole="button" onPress={() => removerAssociacao(objeto)} style={estilos.removerVinculo}><Ionicons name="unlink-outline" size={16} color={cores.vermelho} /><Text style={estilos.textoRemoverVinculo}>Desassociar dispositivo</Text></Pressable>
                 </View>

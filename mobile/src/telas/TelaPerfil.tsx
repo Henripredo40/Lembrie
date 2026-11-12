@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Aviso, Botao, CampoTexto } from '../componentes/Elementos';
 import { cores } from '../tema';
 import estilos from '../estilos/TelaPerfil.estilos';
-import { codigoEmailValido, emailValido, senhaTemTamanhoMinimo, senhasIguais } from '../utils/validacaoConta';
+import { codigoEmailValido, emailValido, senhaTemTamanhoMinimo, senhasIguais } from '../utilitarios/validacaoConta';
 
 export default function TelaPerfil({ perfil, salvarPerfil, solicitarVerificacaoEmail, alterarSenha, recuperarSenha, notificar }) {
   const [nome, definirNome] = useState(perfil?.name || '');

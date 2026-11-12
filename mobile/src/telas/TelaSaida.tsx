@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, Botao, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
-import { alternarItemConferido, criarDadosConferencia, criarListaSaida, criarResumoSaida, lerChecklistPerfil } from '../utils/listaSaida';
-import { salvarResumoSaidaBluetooth } from '../utils/resumoSaidaBluetooth';
+import { alternarItemConferido, criarDadosConferencia, criarListaSaida, criarResumoSaida, lerChecklistPerfil } from '../utilitarios/listaDeSaida';
+import { salvarResumoSaidaBluetooth } from '../utilitarios/resumoSaidaBluetooth';
 
 export default function TelaSaida({ objetos, api, notificar, atualizarDados, somenteEssenciais, destinoInicial = '', salvarResumo = salvarResumoSaidaBluetooth }) {
   const [destino, definirDestino] = useState('');

@@ -1,4 +1,4 @@
-module.exports = function registerPlacesRoutes({ app, auth, formatarResultadoLugar, pontuarCorrespondenciaBusca, estadoDosMapas }) {
+module.exports = function registrarRotasDeLugares({ app, auth, formatarResultadoLugar, pontuarCorrespondenciaBusca, estadoDosMapas }) {
 app.get('/postal-codes/lookup', auth, async (q, r) => {
   const cep = String(q.query.cep || '').replace(/\D/g, '');
   if (!/^\d{8}$/.test(cep)) return r.status(400).json({ error: 'Digite um CEP com 8 números.' });
