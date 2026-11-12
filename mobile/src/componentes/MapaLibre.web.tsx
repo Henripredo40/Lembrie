@@ -5,6 +5,12 @@ import * as maplibregl from 'maplibre-gl';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+// O Expo/Metro não empacota automaticamente o worker ESM que o MapLibre 6
+// procura ao lado do módulo. Sirva o arquivo da pasta public com MIME JavaScript.
+if (typeof window !== 'undefined') {
+  maplibregl.setWorkerUrl(new URL('/maplibre-gl-worker.mjs', window.location.href).toString());
+}
+
 type Propriedades = {
   latitude: number;
   longitude: number;
