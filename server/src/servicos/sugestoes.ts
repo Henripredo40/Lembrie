@@ -1,7 +1,4 @@
-function sugerirItensDestino(destination, objects = []) {
-  const d = String(destination || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-
-  const rules: Array<[string, string[]]> = [
+const regrasPorDestino: Array<[string, string[]]> = [
     [
       'academia',
       [
@@ -85,11 +82,14 @@ function sugerirItensDestino(destination, objects = []) {
         'Cartão do convênio'
       ]
     ]
-  ];
+];
+
+function sugerirItensDestino(destination, objects = []) {
+  const d = String(destination || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
   let base = [];
 
-  for (const [k, v] of rules) {
+  for (const [k, v] of regrasPorDestino) {
     if (d.includes(k)) {
       base.push(...v);
     }

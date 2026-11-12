@@ -6,6 +6,8 @@
   "scripts": {
     "start": "expo start",
     "build:web": "node scripts/copiar-worker-mapa.mjs && expo export --platform web",
+    "test:componentes": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit"
@@ -37,8 +39,21 @@
     "react-native-web": "^0.21.4",
     "react-native-webview": "14.0.1"
   },
+  "jest": {
+    "preset": "jest-expo",
+    "testTimeout": 15000,
+    "testPathIgnorePatterns": ["<rootDir>/src/utilitarios/regrasFilaSemConexao.test.ts"],
+    "setupFilesAfterEnv": [
+      "<rootDir>/test/setup.ts"
+    ]
+  },
   "devDependencies": {
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
+    "expo-modules-core": "~58.0.28",
+    "jest": "^30.5.2",
+    "jest-expo": "~58.0.13",
     "typescript": "~6.0.3"
   }
 }

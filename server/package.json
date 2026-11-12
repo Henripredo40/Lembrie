@@ -9,7 +9,7 @@
     "start:prod": "node dist/server.js",
     "migrate:cloud": "tsx src/migrate-cloud.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/servicos/servicos.test.ts src/rotas/rotas.test.ts ../mobile/src/utilitarios/regrasFilaSemConexao.test.ts"
+    "test": "tsx --test src/servicos/servicos.test.ts src/rotas/rotas.test.ts src/rotas/api.integration.test.ts ../mobile/src/utilitarios/regrasFilaSemConexao.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -28,6 +28,8 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.15.30",
     "@types/nodemailer": "^6.4.17",
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.3.2",
     "tsx": "^4.19.2",
     "typescript": "~5.8.3"
   }

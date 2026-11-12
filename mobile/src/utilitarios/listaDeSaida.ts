@@ -2,7 +2,7 @@ import { normalizarTexto, objetoÉEssencial } from './objetos';
 
 export function criarListaSaida(objetos, sugestões = [], somenteEssenciais = false) {
   const base = somenteEssenciais ? objetos.filter(objetoÉEssencial) : objetos;
-  const registrados = new Set(base.map((objeto) => normalizarTexto(objeto.name)));
+  const registrados = new Set(objetos.map((objeto) => normalizarTexto(objeto.name)));
   const itens = base.map((objeto) => ({
     id: objeto.id,
     name: objeto.name,

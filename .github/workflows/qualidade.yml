@@ -1,0 +1,56 @@
+name: Verificações de qualidade
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API — testes, tipos e build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Instalar dependências da API
+        run: npm ci
+        working-directory: server
+      - name: Executar testes da API
+        run: npm test
+        working-directory: server
+      - name: Verificar tipos da API
+        run: npm run typecheck
+        working-directory: server
+      - name: Compilar a API
+        run: npm run build
+        working-directory: server
+
+  aplicativo:
+    name: App — testes e tipos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o repositório
+        uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Instalar dependências do app
+        run: npm ci
+        working-directory: mobile
+      - name: Executar testes do app
+        run: npm run test:componentes -- --coverage=false
+        working-directory: mobile
+      - name: Verificar tipos do app
+        run: npm run typecheck
+        working-directory: mobile
