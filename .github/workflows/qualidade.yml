@@ -49,7 +49,7 @@ jobs:
         run: npm ci
         working-directory: mobile
       - name: Executar testes do app
-        run: npm run test:componentes -- --coverage=false
+        run: npm run test:componentes -- --coverage=false --forceExit
         working-directory: mobile
       - name: Verificar tipos do app
         run: npm run typecheck
