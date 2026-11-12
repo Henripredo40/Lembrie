@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Aviso, Botao, CampoTexto } from '../componentes/Elementos';
 import { cores } from '../tema';
 import estilos from '../estilos/TelaPerfil.estilos';
+import { codigoEmailValido, emailValido, senhaTemTamanhoMinimo, senhasIguais } from '../utils/validacaoConta';
 
 export default function TelaPerfil({ perfil, salvarPerfil, solicitarVerificacaoEmail, alterarSenha, recuperarSenha, notificar }) {
   const [nome, definirNome] = useState(perfil?.name || '');
@@ -36,8 +37,7 @@ export default function TelaPerfil({ perfil, salvarPerfil, solicitarVerificacaoE
     if (letrasNoNome.length < 2 || !/^[\p{L}\p{M} .'-]+$/u.test(nomeNormalizado)) {
       return definirErroPerfil('Informe um nome válido com pelo menos duas letras.');
     }
-    const formatoEmailValido = emailNormalizado.length <= 254 && /^[A-Z0-9.!#$%&'*+/=?^_{}|~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(emailNormalizado);
-    if (!formatoEmailValido) return definirErroPerfil('Digite um e-mail válido, como nome@exemplo.com.');
+    if (!emailValido(emailNormalizado)) return definirErroPerfil('Digite um e-mail válido, como nome@exemplo.com.');
     definirSalvandoPerfil(true);
     try {
       let emailMudou = emailNormalizado !== String(perfil?.email || '').trim().toLowerCase();
@@ -88,8 +88,8 @@ export default function TelaPerfil({ perfil, salvarPerfil, solicitarVerificacaoE
   async function salvarNovaSenha() {
     definirErroSenha('');
     if (!senhaAtual) return definirErroSenha('Digite sua senha atual.');
-    if (novaSenha.length < 6) return definirErroSenha('A nova senha precisa ter pelo menos 6 caracteres.');
-    if (novaSenha !== confirmarSenha) return definirErroSenha('A confirmação não corresponde à nova senha.');
+    if (!senhaTemTamanhoMinimo(novaSenha)) return definirErroSenha('A nova senha precisa ter pelo menos 6 caracteres.');
+    if (!senhasIguais(novaSenha, confirmarSenha)) return definirErroSenha('A confirmação não corresponde à nova senha.');
     definirSalvandoSenha(true);
     const resultado = await alterarSenha({ senhaAtual, novaSenha });
     definirSalvandoSenha(false);
@@ -112,9 +112,9 @@ export default function TelaPerfil({ perfil, salvarPerfil, solicitarVerificacaoE
 
   async function redefinirComCodigo() {
     definirErroSenha('');
-    if (!/^\d{6}$/.test(codigoRecuperacao)) return definirErroSenha('Digite o código de 6 números enviado ao seu e-mail.');
-    if (novaSenha.length < 6) return definirErroSenha('A nova senha precisa ter pelo menos 6 caracteres.');
-    if (novaSenha !== confirmarSenha) return definirErroSenha('A confirmação não corresponde à nova senha.');
+    if (!codigoEmailValido(codigoRecuperacao)) return definirErroSenha('Digite o código de 6 números enviado ao seu e-mail.');
+    if (!senhaTemTamanhoMinimo(novaSenha)) return definirErroSenha('A nova senha precisa ter pelo menos 6 caracteres.');
+    if (!senhasIguais(novaSenha, confirmarSenha)) return definirErroSenha('A confirmação não corresponde à nova senha.');
     definirRecuperandoSenha(true);
     const resultado = await recuperarSenha({ email: perfil?.email || email, codigo: codigoRecuperacao, senha: novaSenha });
     definirRecuperandoSenha(false);

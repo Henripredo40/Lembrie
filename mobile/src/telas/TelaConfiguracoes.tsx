@@ -1,4 +1,3 @@
-import React from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Aviso, TituloSecao } from '../componentes/Elementos';

@@ -74,3 +74,29 @@ export function objetoTemChaveiro(objeto) {
 export function chaveiroEstáConectado(objeto) {
   return objeto?.connected === true || Number(objeto?.connected) === 1;
 }
+
+export function filtrarObjetos(objetos: any[], { filtro = 'todos', categoria = '', busca = '' }: { filtro?: string; categoria?: string; busca?: string } = {}) {
+  const termo = normalizarTexto(busca.trim());
+  return objetos.filter((objeto) => {
+    if (filtro === 'essenciais' && !objetoÉEssencial(objeto)) return false;
+    if (filtro === 'bluetooth' && !objetoTemChaveiro(objeto)) return false;
+    if (categoria && normalizarTexto(objeto.category) !== normalizarTexto(categoria)) return false;
+    return !termo || normalizarTexto(String(objeto.name) + ' ' + String(objeto.category)).includes(termo);
+  });
+}
+
+export function obterCategoriasDisponiveis(objetos: any[]): Array<{ nome: string; ícone: NomeIcone; objetoRepresentativo?: any }> {
+  const predefinidas = new Set(categoriasDeObjeto.map((opção) => normalizarTexto(opção.nome)));
+  const personalizadas = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter(Boolean))]
+    .filter((nome) => !predefinidas.has(normalizarTexto(nome)))
+    .map((nome) => ({
+      nome,
+      ícone: 'tag-outline' as const,
+      objetoRepresentativo: objetos.find((objeto) => normalizarTexto(objeto.category) === normalizarTexto(nome)),
+    }));
+  return [...categoriasDeObjeto, ...personalizadas];
+}
+
+export function criarDadosObjeto({ nome, categoria, essencial, foto }) {
+  return { name: nome.trim(), category: categoria.trim(), essential: essencial, image_data: foto };
+}

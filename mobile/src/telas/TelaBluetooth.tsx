@@ -1,12 +1,16 @@
 import estilos from '../estilos/TelaBluetooth.estilos';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PermissionsAndroid, Platform, Pressable, ScrollView, Text, View, type Permission } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import { Aviso, Botao, EstadoVazio, TituloSecao } from '../componentes/Elementos';
-import { cores, raios } from '../tema';
+import { cores } from '../tema';
 import { objetoTemChaveiro } from '../utils/objetos';
+import { lerResumoSaidaBluetooth } from '../utils/resumoSaidaBluetooth';
+import { criarPacotesResumoLambrie } from '../utils/protocoloLambrie';
 
+const SERVIÇO_LEMBRIE = '6f6d0001-7a52-4f6c-9a21-4c454d425249';
+const CARACTERÍSTICA_LEMBRIE = '6f6d0002-7a52-4f6c-9a21-4c454d425249';
 let ConstrutorBluetooth = null;
 if (Platform.OS !== 'web') {
   try {
@@ -16,7 +20,7 @@ if (Platform.OS !== 'web') {
   }
 }
 
-export default function TelaBluetooth({ objetos, definirObjetos, api, notificar, abrirObjetos }) {
+export default function TelaBluetooth({ objetos, definirObjetos, api, notificar, abrirObjetos, lerResumo = lerResumoSaidaBluetooth }) {
   const gerente = useRef(null);
   const temporizador = useRef(null);
   const temporizadorSinal = useRef(null);
@@ -31,6 +35,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
   const [vinculando, setVinculando] = useState(false);
   const [conectando, setConectando] = useState(false);
   const [diagnostico, setDiagnostico] = useState(null);
+  const [enviandoResumo, setEnviandoResumo] = useState(false);
 
   useEffect(() => {
     if (objetos.length && !objetos.some((objeto) => String(objeto.id) === String(objetoEscolhido))) {
@@ -238,6 +243,35 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     }
   }
 
+  async function enviarResumoParaTela() {
+    const conexão = conexãoAtual.current;
+    if (!conexão || !gerente.current) {
+      setErro('Conecte primeiro a ESP32-C3 Lambrie nesta tela.');
+      return;
+    }
+    setEnviandoResumo(true);
+    setErro('');
+    try {
+      const resumo = await lerResumo();
+      if (!resumo) throw new Error('Monte uma lista na tela “Antes de sair” primeiro.');
+      const dispositivo = await gerente.current.devices([conexão.id]);
+      const conectado = dispositivo[0] || await gerente.current.connectToDevice(conexão.id);
+      await conectado.discoverAllServicesAndCharacteristics();
+      for (const pacote of criarPacotesResumoLambrie(resumo)) {
+        await conectado.writeCharacteristicWithoutResponseForService(
+          SERVIÇO_LEMBRIE,
+          CARACTERÍSTICA_LEMBRIE,
+          pacote,
+        );
+      }
+      notificar('Resumo da saída enviado para a tela Lambrie.');
+    } catch (falha) {
+      setErro(falha.message || 'Não foi possível enviar o resumo. Confira se o firmware Lambrie está instalado.');
+    } finally {
+      setEnviandoResumo(false);
+    }
+  }
+
   async function removerAssociacao(objeto) {
     try {
       await api('/objects/' + objeto.id, {
@@ -335,6 +369,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
             <View style={estilos.cartaoDiagnostico}>
               <Text style={estilos.tituloBusca}>Conectado: {diagnostico.nome}</Text>
               <Text style={estilos.textoBusca}>Serviços encontrados: {diagnostico.serviços.length}</Text>
+              <Botao título={enviandoResumo ? 'Enviando resumo...' : 'Enviar resumo da saída para a tela'} ícone="paper-plane-outline" aoPressionar={enviarResumoParaTela} carregando={enviandoResumo} estilo={{ marginTop: 12 }} />
               {diagnostico.serviços.map((serviço) => (
                 <View key={serviço.uuid} style={estilos.linhaServico}>
                   <Text style={estilos.uuidServico}>{serviço.uuid}</Text>

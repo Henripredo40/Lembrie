@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { cores, raios } from '../tema';
+import { cores } from '../tema';
 
 const estilos = StyleSheet.create({
   tela: { flex: 1, backgroundColor: cores.fundo },

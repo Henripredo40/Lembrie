@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import MapaOSM from '../componentes/MapaOSM';
+import MapaLibre from '../componentes/MapaLibre';
 import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, Botao, CampoTexto, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
@@ -345,7 +345,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
       <Text style={estilos.sobretitulo}>PLANEJAMENTO</Text>
       <Text style={estilos.titulo}>Mapa e rotina</Text>
-      <Text style={estilos.subtitulo}>Pesquise pelo endereço completo com número ou use o CEP como referência. Role a tela na vertical; deslize o mapa para os lados ou toque nele para ajustar o pino.</Text>
+      <Text style={estilos.subtitulo}>Pesquise pelo endereço completo com número ou use o CEP como referência. Arraste e amplie o mapa para posicionar o pino no local desejado.</Text>
       <View style={estilos.modosBusca}>
         <Pressable accessibilityRole="button" accessibilityState={{ selected: modoBusca === 'endereco' }} onPress={() => { definirModoBusca('endereco'); definirLocais([]); definirErro(''); }} style={[estilos.modoBusca, modoBusca === 'endereco' && estilos.modoBuscaAtivo]}><Text style={[estilos.textoModoBusca, modoBusca === 'endereco' && estilos.textoModoBuscaAtivo]}>Endereço ou lugar</Text></Pressable>
         <Pressable accessibilityRole="button" accessibilityState={{ selected: modoBusca === 'cep' }} onPress={() => { definirModoBusca('cep'); definirLocais([]); definirErro(''); }} style={[estilos.modoBusca, modoBusca === 'cep' && estilos.modoBuscaAtivo]}><Text style={[estilos.textoModoBusca, modoBusca === 'cep' && estilos.textoModoBuscaAtivo]}>Buscar por CEP</Text></Pressable>
@@ -363,12 +363,12 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       </View> : null}
       <Pressable accessibilityRole="button" onPress={localizarAgora} style={estilos.botaoLocalização}><Ionicons name="locate-outline" size={17} color={cores.primario} /><Text style={estilos.textoLocalização}>Mostrar minha localização agora</Text></Pressable>
       {erro ? <Aviso ícone="alert-circle-outline" tom="alerta" texto={erro} /> : null}
-      <MapaOSM
+      <MapaLibre
         latitude={selecionado?.latitude ?? -15.7939}
         longitude={selecionado?.longitude ?? -47.8828}
         aoEscolher={escolherPontoNoMapa}
       />
-      <Text style={estilos.atribuição}>Mapa © OpenStreetMap contributors</Text>
+      <Text style={estilos.atribuição}>Mapa © OpenStreetMap contributors · OpenFreeMap</Text>
       {selecionado ? <>
         <View style={estilos.localSelecionado}><Ionicons name="location" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{selecionado.nome}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{selecionado.endereço}</Text>{selecionado.pontoAproximado ? <Text style={estilos.endereçoResultado}>Endereço exato indisponível; a recomendação usa os locais mapeados mais próximos.</Text> : selecionado.aproximado ? <Text style={estilos.endereçoResultado}>O CEP indica uma referência da rua/região. Para chegar ao número certo, toque no ponto desejado do mapa.</Text> : null}{selecionado.cep ? <Text style={estilos.textoCep}>CEP {selecionado.cep}</Text> : null}</View></View>
         {locaisProximos.categories.length ? <View style={estilos.contextoProximo}><Text style={estilos.tituloContextoProximo}>O que existe por perto</Text><Text style={estilos.textoContextoProximo}>{locaisProximos.categories.join(' · ')}</Text>{locaisProximos.places.length ? <Text style={estilos.textoContextoProximo}>{locaisProximos.places.map(local => local.distancia != null ? `${local.nome} (${local.distancia} m)` : local.nome).join(' · ')}</Text> : null}</View> : null}

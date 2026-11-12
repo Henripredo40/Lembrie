@@ -1,5 +1,5 @@
 import estilos from '../estilos/TelaObjetos.estilos';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -7,8 +7,8 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import ImagemObjeto from '../componentes/ImagemObjeto';
 import { Aviso, Botao, CampoTexto, EstadoVazio, TituloSecao } from '../componentes/Elementos';
-import { cores, raios } from '../tema';
-import { categoriasDeObjeto, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
+import { cores } from '../tema';
+import { categoriasDeObjeto, criarDadosObjeto, filtrarObjetos, normalizarTexto, objetoÉEssencial, obterCategoriasDisponiveis } from '../utils/objetos';
 
 const CATEGORIA_PERSONALIZADA = '__personalizada__';
 type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string; image_data?: string | null } };
@@ -34,31 +34,13 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
   const [objetoRemocao, setObjetoRemocao] = useState(null);
   const [removendo, setRemovendo] = useState(false);
 
-  const categoriasDisponiveis = useMemo<CategoriaComRepresentante[]>(() => {
-    const predefinidas = new Set(categoriasDeObjeto.map((opção) => normalizarTexto(opção.nome)));
-    const personalizadas: CategoriaComRepresentante[] = [...new Set<string>(objetos.map((objeto) => String(objeto.category || '').trim()).filter((nome) => nome.length > 0))]
-      .filter((nome) => !predefinidas.has(normalizarTexto(nome)))
-      .map((nome) => ({
-        nome,
-        ícone: 'tag-outline' as const,
-        objetoRepresentativo: objetos.find((objeto) => normalizarTexto(String(objeto.category || '')) === normalizarTexto(nome)),
-      }));
-    return [...categoriasDeObjeto, ...personalizadas];
-  }, [objetos]);
+  const categoriasDisponiveis = useMemo<CategoriaComRepresentante[]>(() => obterCategoriasDisponiveis(objetos), [objetos]);
 
   useEffect(() => {
     setFiltroCategoria(categoriaInicial || '');
   }, [categoriaInicial]);
 
-  const filtrados = useMemo(() => {
-    let lista = objetos;
-    if (filtro === 'essenciais') lista = lista.filter(objetoÉEssencial);
-    if (filtro === 'bluetooth') lista = lista.filter(objetoTemChaveiro);
-    if (filtroCategoria) lista = lista.filter((objeto) => normalizarTexto(objeto.category) === normalizarTexto(filtroCategoria));
-    const termo = normalizarTexto(busca.trim());
-    if (termo) lista = lista.filter((objeto) => normalizarTexto(String(objeto.name) + ' ' + String(objeto.category)).includes(termo));
-    return lista;
-  }, [objetos, filtro, filtroCategoria, busca]);
+  const filtrados = useMemo(() => filtrarObjetos(objetos, { filtro, categoria: filtroCategoria, busca }), [objetos, filtro, filtroCategoria, busca]);
 
   const categoriaParaSalvar = categoria === CATEGORIA_PERSONALIZADA ? categoriaPersonalizada.trim() : categoria;
   const categoriaEdicaoParaSalvar = categoriaEdicao === CATEGORIA_PERSONALIZADA ? categoriaEdicaoPersonalizada.trim() : categoriaEdicao;
@@ -95,7 +77,7 @@ export default function TelaObjetos({ objetos, definirObjetos, api, categoriaIni
     try {
       const novo = await api('/objects', {
         method: 'POST',
-        body: JSON.stringify({ name: nome.trim(), category: categoriaParaSalvar, essential: essencial, image_data: foto }),
+        body: JSON.stringify(criarDadosObjeto({ nome, categoria: categoriaParaSalvar, essencial, foto })),
       });
       definirObjetos((atuais) => [novo, ...atuais]);
       setNome('');

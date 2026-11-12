@@ -1,5 +1,5 @@
 import estilos from '../estilos/TelaInicio.estilos';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView,  Text, TextInput, Pressable, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CartaoObjeto from '../componentes/CartaoObjeto';
@@ -8,7 +8,6 @@ import { Aviso, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
 import { categoriasDeObjeto, chaveiroEstáConectado, normalizarTexto, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
 
-type CategoriaComRepresentante = (typeof categoriasDeObjeto)[number] & { objetoRepresentativo?: { name: string; category?: string }; rotina?: boolean };
 
 export default function TelaInicio({ perfil, seguranca, mostrarResumoLogin = true, mostrarAtalhosFlutuantes = true, compacto = false, objetos, busca, definirBusca, abrirTela, atualizar, atualizando, erroConexao, mostrarAlertas, api, rotinaAtiva, sugestaoGPS }) {
   const [categoriasDaRotina, definirCategoriasDaRotina] = useState<string[]>([]);

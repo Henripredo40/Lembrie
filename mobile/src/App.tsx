@@ -1,9 +1,11 @@
 import estilos from './estilos/App.estilos';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Linking, Modal, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { FilaOffline } from './utils/filaOffline';
+import { criarClienteApi } from './servicos/clienteApi';
 import * as Location from 'expo-location';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import TelaAutenticacao from './telas/TelaAutenticacao';
@@ -51,6 +53,8 @@ export default function App() {
   const [carregandoAutenticação, definirCarregandoAutenticação] = useState(false);
   const [atualizando, definirAtualizando] = useState(false);
   const [erroConexão, definirErroConexão] = useState('');
+  const [operaçõesPendentes, definirOperaçõesPendentes] = useState(0);
+  const [erroSincronização, definirErroSincronização] = useState('');
   const [salvandoPreferências, definirSalvandoPreferências] = useState(false);
   const [saindo, definirSaindo] = useState(false);
   const [notificaçãoWeb, definirNotificaçãoWeb] = useState('');
@@ -60,6 +64,7 @@ export default function App() {
   const sessãoConta = useRef<string | null>(null);
   const [idSessãoConta, definirIdSessãoConta] = useState<string | null>(null);
   const localEnviadoNaSessão = useRef<string | null>(null);
+  const filaOffline = useRef(new FilaOffline()).current;
   const sessaoMaisRecente = seguranca?.sessions?.[0];
   const dataUltimoLogin = seguranca?.last_login ? new Date(String(seguranca.last_login).replace(' ', 'T')) : null;
   const textoUltimoLogin = dataUltimoLogin && !Number.isNaN(dataUltimoLogin.getTime())
@@ -92,37 +97,17 @@ export default function App() {
 
   useEffect(() => {
     let ativo = true;
-    AsyncStorage.getItem('token')
-      .then((valor) => { if (ativo && valor) definirToken(valor); })
+    Promise.all([AsyncStorage.getItem('token'), filaOffline.carregarEscopo()])
+      .then(([valor]) => { if (ativo && valor) definirToken(valor); })
       .catch(() => {})
       .finally(() => { if (ativo) definirRestaurando(false); });
     return () => { ativo = false; };
-  }, []);
+  }, [filaOffline]);
 
-  const chamarApi = useCallback(async (caminho: string, opções: RequestInit = {}): Promise<any> => {
-    let resposta;
-    try {
-      resposta = await fetch(endereçoDaApi + caminho, {
-        ...opções,
-        headers: {
-          ...(opções.body ? { 'Content-Type': 'application/json' } : {}),
-          ...(token ? { Authorization: 'Bearer ' + token } : {}),
-          ...(opções.headers || {}),
-        },
-      });
-    } catch (falha) {
-      throw new Error('Não consegui acessar o servidor. Verifique a internet e tente novamente.');
-    }
-
-    const texto = await resposta.text();
-    let dados: any = {};
-    try { dados = texto ? JSON.parse(texto) : {}; } catch (falha) { dados = { message: texto }; }
-    if (!resposta.ok) {
-      const erro = Object.assign(new Error(dados.message || dados.error || 'Não foi possível concluir. Tente novamente.'), { status: resposta.status });
-      throw erro;
-    }
-    return dados;
-  }, [token]);
+  const chamarApi = useCallback(
+    criarClienteApi({ endereco: endereçoDaApi, token, filaOffline, aoAtualizarPendentes: definirOperaçõesPendentes }),
+    [token, filaOffline],
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -224,6 +209,27 @@ export default function App() {
     if (token && permissaoLocalizacao === 'permitida') carregarDados(true);
   }, [token, permissaoLocalizacao, carregarDados]);
 
+  useEffect(() => {
+    if (!token) { definirOperaçõesPendentes(0); return; }
+    let ativo = true;
+    let sincronizando = false;
+    const sincronizar = async () => {
+      if (sincronizando || !await filaOffline.quantidadePendente()) return;
+      sincronizando = true;
+      const resultado = await filaOffline.sincronizar(token, endereçoDaApi);
+      if (ativo) {
+        definirOperaçõesPendentes(resultado.pendentes);
+        definirErroSincronização(resultado.erro || '');
+        if (resultado.sincronizadas > 0 && resultado.pendentes === 0) void carregarDados(true);
+      }
+      sincronizando = false;
+    };
+    void sincronizar();
+    const intervalo = setInterval(sincronizar, 15000);
+    const inscrição = AppState.addEventListener('change', estado => { if (estado === 'active') void sincronizar(); });
+    return () => { ativo = false; clearInterval(intervalo); inscrição.remove(); };
+  }, [token, filaOffline, carregarDados]);
+
   function notificar(mensagem) {
     if (Platform.OS === 'web') {
       if (temporizadorNotificação.current) clearTimeout(temporizadorNotificação.current);
@@ -236,6 +242,7 @@ export default function App() {
 
   async function aceitarSessão(dados) {
     await AsyncStorage.setItem('token', dados.token);
+    if (dados.user?.id != null) await filaOffline.definirEscopo(String(dados.user.id));
     if (dados.session_id) await AsyncStorage.setItem('account_session_id', String(dados.session_id));
     definirIdSessãoConta(dados.session_id ? String(dados.session_id) : null);
     definirToken(dados.token);
@@ -551,6 +558,13 @@ export default function App() {
             <Ionicons name="cloud-offline-outline" size={17} color={cores.laranja} />
             <Text style={estilos.textoFaixaErro} numberOfLines={2}>{erroConexão} Toque para tentar atualizar.</Text>
           </Pressable>
+        ) : null}
+
+        {operaçõesPendentes > 0 ? (
+          <View accessibilityRole="status" style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginHorizontal: 16, marginTop: 8, padding: 11, borderRadius: 12, backgroundColor: '#FFF4D6' }}>
+            <Ionicons name="cloud-upload-outline" size={18} color="#8A5B00" />
+            <Text style={{ flex: 1, color: '#684500', fontSize: 13, fontWeight: '700' }}>{operaçõesPendentes} alteração(ões) salva(s) neste aparelho aguardando envio.{erroSincronização ? ' ' + erroSincronização : ''}</Text>
+          </View>
         ) : null}
 
           {conteúdo}

@@ -2,7 +2,7 @@ import estilos from '../estilos/Elementos.estilos';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View, type TextInputProps, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { cores, raios } from '../tema';
+import { cores } from '../tema';
 
 type IconeIon = React.ComponentProps<typeof Ionicons>['name'];
 

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Botao, CampoTexto } from '../componentes/Elementos';
 import GoogleRecuperacao from '../componentes/GoogleRecuperacao';
 import { cores } from '../tema';
 import estilos from '../estilos/TelaAutenticacao.estilos';
+import { codigoEmailValido, senhaTemTamanhoMinimo, senhasIguais } from '../utils/validacaoConta';
 
 export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, recuperarSenhaGoogle, carregando }) {
   const [modoCadastro, setModoCadastro] = useState(false);
@@ -31,9 +32,9 @@ export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, re
     definirErro('');
     definirAviso('');
     if (codigoEnviado) {
-      if (!/^\d{6}$/.test(codigo)) return definirErro('Digite o código de 6 dígitos recebido por e-mail.');
-      if (novaSenha.length < 6) return definirErro('A nova senha precisa ter pelo menos 6 caracteres.');
-      if (novaSenha !== confirmarNovaSenha) return definirErro('As senhas não são iguais.');
+      if (!codigoEmailValido(codigo)) return definirErro('Digite o código de 6 dígitos recebido por e-mail.');
+      if (!senhaTemTamanhoMinimo(novaSenha)) return definirErro('A nova senha precisa ter pelo menos 6 caracteres.');
+      if (!senhasIguais(novaSenha, confirmarNovaSenha)) return definirErro('As senhas não são iguais.');
     }
     const resultado = await recuperarSenha(codigoEnviado ? { email, codigo, senha: novaSenha } : { email });
     if (resultado?.erro) return definirErro(resultado.erro);
@@ -56,8 +57,8 @@ export default function TelaAutenticacao({ entrar, cadastrar, recuperarSenha, re
   async function redefinirComGoogle() {
     definirErro('');
     definirAviso('');
-    if (novaSenha.length < 6) return definirErro('A senha precisa ter pelo menos 6 caracteres.');
-    if (novaSenha !== confirmarNovaSenha) return definirErro('As senhas não são iguais.');
+    if (!senhaTemTamanhoMinimo(novaSenha)) return definirErro('A senha precisa ter pelo menos 6 caracteres.');
+    if (!senhasIguais(novaSenha, confirmarNovaSenha)) return definirErro('As senhas não são iguais.');
     const resultado = await recuperarSenhaGoogle({ idToken: tokenGoogle, senha: novaSenha });
     if (resultado?.erro) return definirErro(resultado.erro);
     definirRecuperacao(false);

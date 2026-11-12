@@ -1,13 +1,14 @@
 import estilos from '../estilos/TelaSaida.estilos';
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView,  Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ImagemObjeto from '../componentes/ImagemObjeto';
-import { Aviso, Botao, CampoTexto, EstadoVazio, TituloSecao } from '../componentes/Elementos';
+import { Aviso, Botao, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
-import { normalizarTexto, objetoÉEssencial } from '../utils/objetos';
+import { alternarItemConferido, criarDadosConferencia, criarListaSaida, criarResumoSaida, lerChecklistPerfil } from '../utils/listaSaida';
+import { salvarResumoSaidaBluetooth } from '../utils/resumoSaidaBluetooth';
 
-export default function TelaSaida({ objetos, api, notificar, atualizarDados, somenteEssenciais, destinoInicial = '' }) {
+export default function TelaSaida({ objetos, api, notificar, atualizarDados, somenteEssenciais, destinoInicial = '', salvarResumo = salvarResumoSaidaBluetooth }) {
   const [destino, definirDestino] = useState('');
   const [lista, definirLista] = useState([]);
   const [sugestoes, definirSugestoes] = useState([]);
@@ -30,7 +31,9 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
 
   const conferidos = useMemo(() => lista.filter((item) => item.conferido).length, [lista]);
   const progresso = lista.length ? Math.round(conferidos * 100 / lista.length) : 0;
-  const objetosParaConferir = somenteEssenciais ? objetos.filter(objetoÉEssencial) : objetos;
+  useEffect(() => {
+    salvarResumo(criarResumoSaida(destino, lista)).catch(() => {});
+  }, [destino, lista]);
 
   async function montarLista() {
     definirErro('');
@@ -49,31 +52,19 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
           definirErro('Não consegui carregar as sugestões do destino. Montei a lista com os objetos cadastrados.');
         }
       }
-      const nomesRegistrados = new Set(objetosParaConferir.map((item) => normalizarTexto(item.name)));
-      const sugestõesNovas = itensSugeridos
-        .filter((nome) => !nomesRegistrados.has(normalizarTexto(nome)))
-        .map((nome, índice) => ({ id: 'sugestao-' + índice, name: nome, category: 'Sugestão', essential: false, sugestao: true, conferido: false }));
-      const listaObjetos = objetosParaConferir.map((objeto) => ({
-        id: objeto.id,
-        name: objeto.name,
-        category: objeto.category,
-        image_data: objeto.image_data,
-        essential: objetoÉEssencial(objeto),
-        sugestao: false,
-        conferido: false,
-      }));
-      definirLista([...listaObjetos, ...sugestõesNovas]);
-      definirSugestoes(sugestõesNovas);
-      if (!listaObjetos.length && !sugestõesNovas.length && somenteEssenciais) {
+      const resultado = criarListaSaida(objetos, itensSugeridos, somenteEssenciais);
+      definirLista(resultado.itens);
+      definirSugestoes(resultado.sugestões);
+      if (!resultado.itens.length && somenteEssenciais) {
         definirErro('Ainda não há objetos essenciais. Marque algum objeto como essencial ou desative esse filtro nas configurações.');
       }
-      if (listaObjetos.length || sugestõesNovas.length) {
+      if (resultado.itens.length) {
         const destinoRegistrado = destino.trim() || 'sem destino informado';
         api('/events', {
           method: 'POST',
           body: JSON.stringify({
             type: 'lista_saida',
-            message: 'Lista de saída para ' + destinoRegistrado + ' montada com ' + (listaObjetos.length + sugestõesNovas.length) + ' itens.',
+            message: 'Lista de saída para ' + destinoRegistrado + ' montada com ' + resultado.itens.length + ' itens.',
           }),
         }).then(() => atualizarDados?.()).catch(() => {});
       }
@@ -85,7 +76,7 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
   }
 
   function alternarConferido(id) {
-    definirLista((atuais) => atuais.map((item) => item.id === id ? { ...item, conferido: !item.conferido } : item));
+    definirLista((atuais) => alternarItemConferido(atuais, id));
     definirResultadoSaida(null);
   }
 
@@ -112,8 +103,7 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
       const resultado = await api('/departure/check', {
         method: 'POST',
         body: JSON.stringify({
-          destination: destino.trim(),
-          checked_ids: lista.filter((item) => item.conferido && !item.sugestao).map((item) => Number(item.id)).filter(Number.isFinite),
+          ...criarDadosConferencia(destino, lista),
         }),
       });
       definirResultadoSaida(resultado);
@@ -156,17 +146,8 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
 
   function usarPerfil(perfil) {
     definirDestino(perfil.destination || '');
-    let itens = [];
-    try {
-      itens = typeof perfil.checklist_json === 'string' ? JSON.parse(perfil.checklist_json) : perfil.checklist_json || [];
-    } catch (falha) {
-      itens = [];
-    }
-    const itensDoPerfil = Array.isArray(itens) ? itens : [];
-    const itensFiltrados = somenteEssenciais
-      ? itensDoPerfil.filter((item) => item.essential === true || Number(item.essential) === 1)
-      : itensDoPerfil;
-    definirLista(itensFiltrados.map((item, índice) => ({ ...item, id: item.id || 'perfil-' + índice, conferido: false })));
+    const itensFiltrados = lerChecklistPerfil(perfil, somenteEssenciais);
+    definirLista(itensFiltrados);
     definirSugestoes([]);
     definirErro(somenteEssenciais && itensFiltrados.length === 0
       ? 'Este perfil não tem objetos essenciais. Desative o filtro ou monte uma lista nova.'

@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start:prod": "node dist/server.js",
     "migrate:cloud": "tsx src/migrate-cloud.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/servicos/servicos.test.ts src/rotas/rotas.test.ts ../mobile/src/utils/filaOfflineLogica.test.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

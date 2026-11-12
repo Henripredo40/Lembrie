@@ -1,9 +1,8 @@
 import estilos from '../estilos/CartaoObjeto.estilos';
-import React from 'react';
 import { Pressable,  Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ImagemObjeto from './ImagemObjeto';
-import { cores, raios } from '../tema';
+import { cores } from '../tema';
 import { chaveiroEstáConectado, objetoÉEssencial, objetoTemChaveiro } from '../utils/objetos';
 
 export default function CartaoObjeto({ objeto, aoEditar, aoRemover, compacto = false }: { objeto: any; aoEditar?: () => void; aoRemover?: () => void; compacto?: boolean }) {
