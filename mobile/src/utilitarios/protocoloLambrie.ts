@@ -23,7 +23,7 @@ export function criarPacotesResumoLambrie(resumo: ResumoSaidaBluetooth, tamanhoP
   }, tamanhoPacote);
 }
 
-export function criarPacotesComandoLambrie(command: 'arm' | 'disarm' | 'locate', tamanhoPacote = 18) {
+export function criarPacotesComandoLambrie(command: 'arm' | 'disarm' | 'locate' | 'registration_done' | 'registration_error', tamanhoPacote = 18) {
   return criarPacotesMensagemLambrie({ command }, tamanhoPacote);
 }
 

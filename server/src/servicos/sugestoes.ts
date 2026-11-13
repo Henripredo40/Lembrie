@@ -1,87 +1,87 @@
 const regrasPorDestino: Array<[string, string[]]> = [
+  [
+    'academia',
     [
-      'academia',
-      [
-        'Garrafa de água',
-        'Toalha',
-        'Fone de ouvido'
-      ]
-    ],
-    [
-      'trabalho',
-      [
-        'Notebook',
-        'Carregador',
-        'Crachá'
-      ]
-    ],
-    [
-      'escola',
-      [
-        'Mochila',
-        'Caderno ou material da aula',
-        'Estojo com lápis e canetas',
-        'Livros ou apostilas do dia',
-        'Agenda ou planner',
-        'Garrafa de água',
-        'Lanche'
-      ]
-    ],
-    [
-      'colegio',
-      [
-        'Mochila',
-        'Caderno ou material da aula',
-        'Estojo com lápis e canetas',
-        'Livros ou apostilas do dia',
-        'Agenda ou planner',
-        'Garrafa de água',
-        'Lanche'
-      ]
-    ],
-    [
-      'faculdade',
-      [
-        'Caderno',
-        'Notebook',
-        'Carregador'
-      ]
-    ],
-    [
-      'viagem',
-      [
-        'Documento',
-        'Carteira',
-        'Carregador'
-      ]
-    ],
-    [
-      'praia',
-      [
-        'Protetor solar',
-        'Toalha',
-        'Garrafa de água',
-        'Chapéu ou boné',
-        'Roupa de banho',
-        'Chinelo',
-        'Óculos de sol'
-      ]
-    ],
-    [
-      'mercado',
-      [
-        'Carteira',
-        'Sacola'
-      ]
-    ],
-    [
-      'medico',
-      [
-        'Documento',
-        'Carteira',
-        'Cartão do convênio'
-      ]
+      'Garrafa de água',
+      'Toalha',
+      'Fone de ouvido'
     ]
+  ],
+  [
+    'trabalho',
+    [
+      'Notebook',
+      'Carregador',
+      'Crachá'
+    ]
+  ],
+  [
+    'escola',
+    [
+      'Mochila',
+      'Caderno ou material da aula',
+      'Estojo com lápis e canetas',
+      'Livros ou apostilas do dia',
+      'Agenda ou planner',
+      'Garrafa de água',
+      'Lanche'
+    ]
+  ],
+  [
+    'colegio',
+    [
+      'Mochila',
+      'Caderno ou material da aula',
+      'Estojo com lápis e canetas',
+      'Livros ou apostilas do dia',
+      'Agenda ou planner',
+      'Garrafa de água',
+      'Lanche'
+    ]
+  ],
+  [
+    'faculdade',
+    [
+      'Caderno',
+      'Notebook',
+      'Carregador'
+    ]
+  ],
+  [
+    'viagem',
+    [
+      'Documento',
+      'Carteira',
+      'Carregador'
+    ]
+  ],
+  [
+    'praia',
+    [
+      'Protetor solar',
+      'Toalha',
+      'Garrafa de água',
+      'Chapéu ou boné',
+      'Roupa de banho',
+      'Chinelo',
+      'Óculos de sol'
+    ]
+  ],
+  [
+    'mercado',
+    [
+      'Carteira',
+      'Sacola'
+    ]
+  ],
+  [
+    'medico',
+    [
+      'Documento',
+      'Carteira',
+      'Cartão do convênio'
+    ]
+  ]
 ];
 
 function sugerirItensDestino(destination, objects = []) {

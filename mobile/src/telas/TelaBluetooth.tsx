@@ -1,6 +1,6 @@
 import estilos from '../estilos/TelaBluetooth.estilos';
 import { useEffect, useRef, useState } from 'react';
-import { PermissionsAndroid, Platform, Pressable, ScrollView, Text, View, type Permission } from 'react-native';
+import { PermissionsAndroid, Platform, Pressable, ScrollView, Text, TextInput, View, type Permission } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import { Aviso, Botao, EstadoVazio, TituloSecao } from '../componentes/Elementos';
@@ -11,6 +11,27 @@ import { criarPacotesComandoLambrie, criarPacotesResumoLambrie } from '../utilit
 
 const SERVIÇO_LEMBRIE = '6f6d0001-7a52-4f6c-9a21-4c454d425249';
 const CARACTERÍSTICA_LEMBRIE = '6f6d0002-7a52-4f6c-9a21-4c454d425249';
+const CARACTERISTICA_EVENTOS = '6f6d0003-7a52-4f6c-9a21-4c454d425249';
+const ALFABETO_BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function decodificarEventoBase64(valor) {
+  let resultado = '';
+  let acumulador = 0;
+  let bits = 0;
+  for (const caractere of valor || '') {
+    if (caractere === '=') break;
+    const digito = ALFABETO_BASE64.indexOf(caractere);
+    if (digito < 0) continue;
+    acumulador = (acumulador << 6) | digito;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      resultado += String.fromCharCode((acumulador >> bits) & 255);
+      acumulador &= (1 << bits) - 1;
+    }
+  }
+  return resultado;
+}
 let ConstrutorBluetooth = null;
 let gerenteBluetoothCompartilhado = null;
 let conexãoLambrieCompartilhada = null;
@@ -92,6 +113,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
   const temporizador = useRef(null);
   const temporizadorSinal = useRef(null);
   const inscriçãoDesconexão = useRef(null);
+  const inscriçãoCadastroChaveiro = useRef(null);
   const conexãoAtual = useRef(null);
   const [estadoBluetooth, setEstadoBluetooth] = useState('Verificando');
   const [erro, setErro] = useState('');
@@ -103,8 +125,81 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
   const [conectando, setConectando] = useState(false);
   const [diagnostico, setDiagnostico] = useState(null);
   const [enviandoResumo, setEnviandoResumo] = useState(false);
+  const [cadastroSolicitado, definirCadastroSolicitado] = useState(false);
+  const [nomeCadastroChaveiro, definirNomeCadastroChaveiro] = useState('');
+  const [salvandoCadastroChaveiro, definirSalvandoCadastroChaveiro] = useState(false);
+  const [erroCadastroChaveiro, definirErroCadastroChaveiro] = useState('');
   const [localizando, setLocalizando] = useState(false);
   const componenteAtivo = useRef(false);
+
+  function acompanharPedidoCadastro(dispositivo) {
+    inscriçãoCadastroChaveiro.current?.remove();
+    const receberEvento = (erroMonitoramento, característica) => {
+      if (erroMonitoramento || !característica?.value || !componenteAtivo.current) return;
+      try {
+        const evento = JSON.parse(decodificarEventoBase64(característica.value));
+        if (evento.event === 'register_object') {
+          definirNomeCadastroChaveiro('');
+          definirErroCadastroChaveiro('');
+          definirCadastroSolicitado(true);
+        }
+      } catch (erro) {
+        // Ignora mensagens que não pertencem ao protocolo de cadastro.
+      }
+    };
+    inscriçãoCadastroChaveiro.current = dispositivo.monitorCharacteristicForService(
+      SERVIÇO_LEMBRIE,
+      CARACTERISTICA_EVENTOS,
+      receberEvento,
+    );
+    dispositivo.readCharacteristicForService(SERVIÇO_LEMBRIE, CARACTERISTICA_EVENTOS)
+      .then((característica) => receberEvento(null, característica))
+      .catch(() => {});
+  }
+
+  async function concluirCadastroSolicitado() {
+    const nome = nomeCadastroChaveiro.trim();
+    if (!nome) {
+      definirErroCadastroChaveiro('Informe o nome do objeto.');
+      return;
+    }
+    definirSalvandoCadastroChaveiro(true);
+    definirErroCadastroChaveiro('');
+    try {
+      const novo = await api('/objects', {
+        method: 'POST',
+        body: JSON.stringify({ name: nome, category: 'Outros', essential: false }),
+      });
+      definirObjetos((atuais) => [novo, ...atuais]);
+      definirCadastroSolicitado(false);
+      definirNomeCadastroChaveiro('');
+      let resumoEnviado = false;
+      const conexão = conexãoAtual.current;
+      if (conexão && gerente.current) {
+        try {
+          const dispositivo = (await gerente.current.devices([conexão.id]))[0];
+          if (dispositivo) {
+            for (const pacote of criarPacotesResumoLambrie({ destination: 'Novo objeto', items: [nome], updatedAt: Date.now() })) {
+              await dispositivo.writeCharacteristicWithoutResponseForService(SERVIÇO_LEMBRIE, CARACTERÍSTICA_LEMBRIE, pacote);
+            }
+            resumoEnviado = true;
+          }
+        } catch (falhaAoAtualizarVisor) {
+          // O cadastro já foi aceito pelo app; a tela pode ser atualizada ao reconectar.
+        }
+      }
+      notificar(resumoEnviado ? 'Objeto cadastrado no app e enviado para o visor.' : 'Objeto cadastrado no app; conecte o chaveiro para atualizar o visor.');
+    } catch (falha) {
+      definirErroCadastroChaveiro(falha.message || 'Não foi possível salvar o objeto.');
+      const conexão = conexãoAtual.current;
+      if (conexão && gerente.current) {
+        const dispositivo = (await gerente.current.devices([conexão.id]).catch(() => []))[0];
+        if (dispositivo) await enviarComandoLambrie(dispositivo, 'registration_error').catch(() => {});
+      }
+    } finally {
+      definirSalvandoCadastroChaveiro(false);
+    }
+  }
 
   useEffect(() => {
     if (objetos.length && !objetos.some((objeto) => String(objeto.id) === String(objetoEscolhido))) {
@@ -145,6 +240,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
           const dispositivo = conectados.find((item) => item.id === conexãoSalva.id);
           if (!dispositivo) return;
           await dispositivo.discoverAllServicesAndCharacteristics();
+          acompanharPedidoCadastro(dispositivo);
           const serviços = await dispositivo.services();
           setDiagnostico({ nome: dispositivo.name || 'Lambrie ESP32C3', serviços: await Promise.all((serviços || []).map(async (serviço) => ({
             uuid: serviço.uuid,
@@ -164,6 +260,8 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
         try { novoGerente.stopDeviceScan(); } catch (falha) {}
         inscriçãoDesconexão.current?.remove();
         inscriçãoDesconexão.current = null;
+        inscriçãoCadastroChaveiro.current?.remove();
+        inscriçãoCadastroChaveiro.current = null;
         inscrição.remove();
         // Mantém a conexão BLE durante a navegação no app para que o chaveiro
         // possa detectar uma perda real de proximidade, sem alertar ao trocar de tela.
@@ -192,6 +290,8 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     inscriçãoDesconexão.current = gerente.current.onDeviceDisconnected(id, () => {
       if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
       temporizadorSinal.current = null;
+      inscriçãoCadastroChaveiro.current?.remove();
+      inscriçãoCadastroChaveiro.current = null;
       conexãoAtual.current = null;
       if (conexãoLambrieCompartilhada?.id === id) conexãoLambrieCompartilhada = null;
       if (componenteAtivo.current) {
@@ -282,6 +382,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       pararBusca();
       const conectado = await gerente.current.connectToDevice(dispositivoEscolhido.id, { timeout: 12000 });
       await conectado.discoverAllServicesAndCharacteristics();
+      acompanharPedidoCadastro(conectado);
       const serviços = await conectado.services();
       const listaServiços = await Promise.all(serviços.map(async (serviço) => {
         const características = await conectado.characteristicsForService(serviço.uuid);
@@ -552,6 +653,25 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
           ) : null}
 
           <TituloSecao título={'OBJETOS ASSOCIADOS · ' + associados.length} />
+          {cadastroSolicitado ? (
+            <View style={estilos.cartaoCadastroChaveiro}>
+              <Text style={estilos.tituloBusca}>Cadastro pedido pelo chaveiro</Text>
+              <Text style={estilos.textoBusca}>Digite o nome. O objeto será salvo na sua conta, na categoria Outros.</Text>
+              <TextInput
+                accessibilityLabel="Nome do objeto solicitado pelo chaveiro"
+                value={nomeCadastroChaveiro}
+                onChangeText={definirNomeCadastroChaveiro}
+                placeholder="Ex.: Chaves de casa"
+                placeholderTextColor={cores.textoSuave}
+                maxLength={60}
+                returnKeyType="done"
+                style={estilos.campoCadastroChaveiro}
+              />
+              {erroCadastroChaveiro ? <Text style={estilos.erroCadastroChaveiro}>{erroCadastroChaveiro}</Text> : null}
+              <Botao título={salvandoCadastroChaveiro ? 'Salvando...' : 'Cadastrar objeto'} aoPressionar={concluirCadastroSolicitado} carregando={salvandoCadastroChaveiro} desativado={!nomeCadastroChaveiro.trim()} />
+            </View>
+          ) : null}
+
           {diagnostico ? (
             <View style={estilos.cartaoDiagnostico}>
               <Text style={estilos.tituloBusca}>Conectado: {diagnostico.nome}</Text>
@@ -594,4 +714,3 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     </ScrollView>
   );
 }
-
