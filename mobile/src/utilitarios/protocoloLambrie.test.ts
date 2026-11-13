@@ -2,7 +2,8 @@ import { describe, expect, test } from '@jest/globals';
 import { criarPacotesComandoLambrie, criarPacotesResumoLambrie } from './protocoloLambrie';
 
 function decodificar(pacotes: string[]) {
-  return Buffer.from(pacotes.join(''), 'base64').toString('utf8');
+  const bytes = pacotes.map(pacote => Buffer.from(pacote, 'base64'));
+  return Buffer.concat(bytes).toString('utf8');
 }
 
 describe('protocolo do chaveiro Lembriê', () => {

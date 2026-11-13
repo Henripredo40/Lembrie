@@ -1,6 +1,8 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import { FilaSemConexao } from './filaSemConexao';
 
+jest.mock('expo-crypto', () => ({ randomUUID: () => 'uuid-de-teste' }));
+
 function criarArmazenamento() {
   const dados = new Map<string, string>();
   return {
