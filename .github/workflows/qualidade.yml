@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   api:
-    name: API — testes, tipos e build
+    name: API — testes, cobertura, tipos e build
     runs-on: ubuntu-latest
     steps:
       - name: Baixar o repositório
@@ -23,8 +23,8 @@ jobs:
       - name: Instalar dependências da API
         run: npm ci
         working-directory: server
-      - name: Executar testes da API
-        run: npm test
+      - name: Executar testes e cobertura da API
+        run: npm run test:coverage
         working-directory: server
       - name: Verificar tipos da API
         run: npm run typecheck
@@ -34,7 +34,7 @@ jobs:
         working-directory: server
 
   aplicativo:
-    name: App — testes e tipos
+    name: App — testes, cobertura e tipos
     runs-on: ubuntu-latest
     steps:
       - name: Baixar o repositório
@@ -48,8 +48,8 @@ jobs:
       - name: Instalar dependências do app
         run: npm ci
         working-directory: mobile
-      - name: Executar testes do app
-        run: npm run test:componentes -- --coverage=false --forceExit
+      - name: Executar testes e cobertura do app
+        run: npm run test:coverage
         working-directory: mobile
       - name: Verificar tipos do app
         run: npm run typecheck
