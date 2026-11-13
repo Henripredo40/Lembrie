@@ -29,7 +29,7 @@ describe('fila persistente sem conexão', () => {
       method: 'POST', headers: expect.objectContaining({ Authorization: 'Bearer token', 'X-Offline-Operation-Id': expect.any(String) }),
     }));
     expect(await fila.resolverCaminho('/objects/local:missing')).toBe('/objects/local:missing');
-    expect(await fila.lerCache('/objects')).toEqual([]);
+    expect(await fila.lerCache('/objects')).toMatchObject([{ id: '42', name: 'Chaves', essential: true }]);
   });
 
   test('rejeita escrita sem escopo e não enfileira rotas sensíveis', async () => {
