@@ -43,6 +43,13 @@
     "preset": "jest-expo",
     "testTimeout": 15000,
     "testPathIgnorePatterns": ["<rootDir>/src/utilitarios/regrasFilaSemConexao.test.ts"],
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/*.test.{ts,tsx}",
+      "!src/estilos/**",
+      "!src/componentes/MapaLibre.*.tsx",
+      "!src/componentes/GoogleRecuperacao.*.tsx"
+    ],
     "setupFilesAfterEnv": [
       "<rootDir>/test/setup.ts"
     ]

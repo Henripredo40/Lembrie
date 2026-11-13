@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">Como ligar o buzzer à placa ESP32-C3 Spotpear</title>
+  <desc id="desc">Diagrama de ligação usando transistor NPN. GPIO6 aciona a base através de resistor; buzzer alimentado pela tensão indicada no seu rótulo; terra comum.</desc>
+  <defs>
+    <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#f4f7fb"/><stop offset="1" stop-color="#e8eef5"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#19324d" flood-opacity=".12"/></filter>
+    <style>
+      text{font-family:Arial,Helvetica,sans-serif;fill:#203044}.title{font-size:38px;font-weight:700}.sub{font-size:19px;fill:#52657a}.head{font-size:22px;font-weight:700}.label{font-size:18px;font-weight:600}.small{font-size:16px;fill:#52657a}.wire{fill:none;stroke:#263746;stroke-width:6;stroke-linecap:round;stroke-linejoin:round}.red{stroke:#d8424c}.blue{stroke:#2878c7}.green{stroke:#39936e}.card{fill:#fff;stroke:#d7e0e9;stroke-width:2;rx:20}.pin{fill:#f0b84e;stroke:#7d5c1e;stroke-width:1.5}
+    </style>
+  </defs>
+  <rect width="1400" height="900" fill="url(#bg)"/>
+  <text x="64" y="72" class="title">Ligação do buzzer — ESP32-C3 Spotpear</text>
+  <text x="64" y="108" class="sub">Use o GPIO6 apenas para comandar o transistor. Não ligue o buzzer diretamente ao pino.</text>
+
+  <!-- Placa representativa -->
+  <rect x="65" y="180" width="340" height="470" rx="28" fill="#1d5549" stroke="#103a32" stroke-width="4" filter="url(#shadow)"/>
+  <text x="235" y="228" text-anchor="middle" font-size="24" font-weight="700" fill="#fff">ESP32-C3 Spotpear</text>
+  <rect x="139" y="270" width="192" height="135" rx="10" fill="#253847" stroke="#81919e" stroke-width="4"/>
+  <text x="235" y="326" text-anchor="middle" font-size="20" font-weight="700" fill="#e8f0f4">ESP32-C3</text>
+  <text x="235" y="359" text-anchor="middle" font-size="15" fill="#bccbd5">placa (vista ilustrativa)</text>
+  <text x="92" y="487" class="small" fill="#fff">Conecte nos pinos identificados</text>
+  <text x="92" y="512" class="small" fill="#fff">no esquema/serigrafia da placa:</text>
+  <rect x="351" y="540" width="35" height="32" rx="5" class="pin"/><text x="344" y="563" text-anchor="end" class="label" fill="#fff">IO6 / GPIO6</text>
+  <rect x="351" y="594" width="35" height="32" rx="5" class="pin"/><text x="344" y="617" text-anchor="end" class="label" fill="#fff">GND</text>
+
+  <!-- Drive path -->
+  <path d="M386 556 H465" class="wire blue"/>
+  <rect x="465" y="536" width="112" height="40" rx="6" fill="#fff" stroke="#50657a" stroke-width="3"/>
+  <path d="M478 556h16l10-12 16 24 16-24 16 24 10-12h15" fill="none" stroke="#263746" stroke-width="3"/>
+  <text x="521" y="522" text-anchor="middle" class="label">1 kΩ</text>
+  <path d="M577 556 H694" class="wire blue"/>
+
+  <!-- NPN transistor -->
+  <circle cx="744" cy="556" r="54" fill="#fff" stroke="#263746" stroke-width="4"/>
+  <path d="M727 526v60m0-30h-33m33-13 35-24m-35 56 35 24" fill="none" stroke="#263746" stroke-width="5" stroke-linecap="round"/>
+  <path d="M755 588l9 1-3-9" fill="none" stroke="#263746" stroke-width="3"/>
+  <text x="744" y="640" text-anchor="middle" class="label">NPN</text>
+  <text x="679" y="514" class="small">B</text><text x="783" y="500" class="small">C</text><text x="783" y="610" class="small">E</text>
+  <path d="M762 580v140h243" class="wire green"/>
+  <text x="776" y="702" class="small" fill="#287653">emissor (E)</text>
+  <!-- Pulldown -->
+  <path d="M640 556v-88h60" class="wire"/>
+  <rect x="700" y="448" width="112" height="40" rx="6" fill="#fff" stroke="#50657a" stroke-width="3"/>
+  <path d="M710 468h12l10-12 16 24 16-24 16 24 10-12h18" fill="none" stroke="#263746" stroke-width="3"/>
+  <path d="M812 468h44v104" class="wire"/>
+  <path d="M856 572v16m-18 0h36m-29 10h22m-15 10h8" class="wire"/>
+  <text x="756" y="435" text-anchor="middle" class="label">10 kΩ</text>
+  <text x="856" y="627" text-anchor="middle" class="small">GND</text>
+
+  <!-- buzzer and power -->
+  <rect x="1050" y="218" width="280" height="164" rx="28" fill="#263746" stroke="#12202b" stroke-width="4" filter="url(#shadow)"/>
+  <circle cx="1190" cy="294" r="48" fill="#e9edf0" stroke="#a8b3ba" stroke-width="4"/>
+  <circle cx="1190" cy="294" r="25" fill="#c9d1d6"/>
+  <text x="1190" y="356" text-anchor="middle" font-size="18" font-weight="700" fill="#fff">BUZZER</text>
+  <circle cx="1076" cy="402" r="10" fill="#d8424c"/><text x="1098" y="409" class="label" fill="#203044">Fio vermelho (+)</text>
+  <circle cx="1076" cy="458" r="10" fill="#263746"/><text x="1098" y="465" class="label">Fio preto (−)</text>
+  <path d="M1076 402H1005V270" class="wire red"/>
+  <circle cx="1005" cy="270" r="8" fill="#d8424c"/>
+  <text x="985" y="236" text-anchor="middle" class="label" fill="#bb303b">+V do buzzer</text>
+  <text x="985" y="257" text-anchor="middle" class="small">tensão permitida no rótulo</text>
+  <path d="M1076 458H969V532H861V502H762" class="wire"/>
+  <text x="913" y="501" text-anchor="middle" class="small">coletor (C)</text>
+  <!-- Supply ground rail and common GND -->
+  <path d="M386 610H446V720H1005" class="wire green"/>
+  <path d="M1005 720h55m-47 10h39m-31 10h23" class="wire green"/>
+  <text x="1074" y="754" class="label" fill="#287653">GND comum: placa + emissor + (−) da fonte externa</text>
+
+  <!-- Diode optional -->
+  <rect x="930" y="555" width="400" height="128" rx="18" class="card"/>
+  <text x="955" y="588" class="head">Diodo (se necessário)</text>
+  <text x="955" y="618" class="small">Para buzzer magnético/indutivo: em paralelo,</text>
+  <text x="955" y="643" class="small">cátodo no +V e ânodo no lado do transistor.</text>
+  <text x="955" y="666" class="small">Buzzer piezoelétrico normalmente não precisa.</text>
+
+  <!-- Note -->
+  <rect x="65" y="790" width="1270" height="68" rx="16" fill="#fff4d9" stroke="#e5bc55" stroke-width="2"/>
+  <text x="90" y="820" class="label">Importante:</text>
+  <text x="200" y="820" class="small">confira a tensão no rótulo do buzzer. Se usar fonte externa, una o negativo dela ao GND da placa. Use um NPN (ex.: 2N2222/BC337)</text>
+  <text x="200" y="844" class="small">e confira o pinout B/C/E do componente; a ordem dos terminais varia conforme o modelo.</text>
+</svg>
