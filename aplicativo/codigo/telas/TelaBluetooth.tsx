@@ -15,6 +15,12 @@ const CARACTERÍSTICA_LEMBRIE = '6f6d0002-7a52-4f6c-9a21-4c454d425249';
 const CARACTERISTICA_EVENTOS = '6f6d0003-7a52-4f6c-9a21-4c454d425249';
 const ALFABETO_BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
+function detalharErroBluetooth(mensagem, erro) {
+  const codigo = erro?.errorCode ?? erro?.code;
+  const detalhe = String(erro?.message || '').replace(/\s+/g, ' ').trim().slice(0, 140);
+  return `${mensagem}${codigo != null ? ` [${codigo}]` : ''}${detalhe ? `: ${detalhe}` : ''}`;
+}
+
 function decodificarEventoBase64(valor) {
   let resultado = '';
   let acumulador = 0;
@@ -408,7 +414,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
               temporizadorReinicioBusca.current = setTimeout(() => iniciarScanner(1), 800);
               return;
             }
-            setErro('A busca foi interrompida. Confirme se o Bluetooth e a Localização estão ligados e tente novamente.');
+            setErro(detalharErroBluetooth('A busca foi interrompida. Confira as permissões de Dispositivos próximos.', falha));
             pararBusca();
             return;
           }
@@ -431,7 +437,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
             try { gerente.current?.stopDeviceScan(); } catch (ignorada) {}
             temporizadorReinicioBusca.current = setTimeout(() => iniciarScanner(1), 800);
           } else {
-            setErro('O Android não conseguiu iniciar a busca. Feche outras telas que usam Bluetooth e tente novamente.');
+            setErro(detalharErroBluetooth('O Android não conseguiu iniciar a busca.', falha));
             pararBusca();
           }
         }
@@ -441,9 +447,10 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     } catch (falha) {
       buscaEmAndamento.current = false;
       const detalhe = String(falha?.message || '').toLowerCase();
-      setErro(detalhe.includes('permission') || detalhe.includes('unauthorized')
-        ? 'O Android bloqueou a busca. Permita Bluetooth e, em aparelhos antigos, Localização; depois tente novamente.'
-        : 'Não foi possível iniciar a busca. Confirme que o Bluetooth do celular está ligado e tente novamente.');
+      const mensagem = detalhe.includes('permission') || detalhe.includes('unauthorized')
+        ? 'O Android bloqueou a busca. Permita Bluetooth e, em aparelhos antigos, Localização.'
+        : 'Não foi possível iniciar a busca. Confira o Bluetooth do celular.';
+      setErro(detalharErroBluetooth(mensagem, falha));
       pararBusca();
     }
   }
