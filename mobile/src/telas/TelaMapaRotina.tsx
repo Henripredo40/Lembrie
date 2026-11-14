@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import MapaLibre from '../componentes/MapaLibre';
@@ -236,9 +236,9 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     try {
       const permissão = await Location.requestForegroundPermissionsAsync();
       if (permissão.status !== 'granted') return definirErro('Permita o acesso à localização durante o uso para mostrar sua posição no mapa.');
-      const posição = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const posição = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
       if (idBusca !== buscaPontoAtual.current) return;
-      const local = { nome: 'Minha localização', endereço: 'Localização atual do aparelho', latitude: posição.coords.latitude, longitude: posição.coords.longitude };
+      const local = { nome: 'Minha localização', endereço: 'Localização atual do aparelho', latitude: posição.coords.latitude, longitude: posição.coords.longitude, precisão: posição.coords.accuracy };
       definirSelecionado(local);
       definirObjetosRecomendadosIA([]);
       definirItensSugeridosGemini([]);
@@ -297,7 +297,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     }
     const idBusca = ++buscaPontoAtual.current;
     const ponto = {
-      id: `coord:${latitude.toFixed(5)},${longitude.toFixed(5)}`,
+      id: `coord:${latitude.toFixed(6)},${longitude.toFixed(6)}`,
       nome: 'Localizando endereço…',
       endereço: 'Mantendo o ponto escolhido no centro do mapa.',
       latitude,
@@ -316,29 +316,42 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
     definirLocais([]);
     definirObjetosSugeridos([]);
     definirErro('');
+    let local = null;
     try {
-      const local = await api(`/places/reverse?lat=${latitude}&lon=${longitude}`);
-      if (idBusca !== buscaPontoAtual.current) return;
-      // Mantém o ponto exato escolhido no mapa e usa o endereço só para mostrar o local.
-      const localSelecionado = { ...local, latitude, longitude };
-      definirSelecionado(localSelecionado);
-      definirCepsDoEndereco(local.cep ? [{ cep: local.cep, bairro: local.bairro || '' }] : []);
-      const próximosPromise = carregarLocaisProximos(latitude, longitude, idBusca);
-      const destino = [localSelecionado.nome, localSelecionado.endereço].filter(Boolean).join(', ').slice(0, 180);
-      const próximos = await próximosPromise;
-      if (idBusca !== buscaPontoAtual.current) return;
-      const dados = await carregarItensDoDestino(destino, idBusca, próximos.categories);
-      if (idBusca === buscaPontoAtual.current) await sugerirItensComIA(destino, próximos, dados?.allRegisteredItems || [], idBusca);
+      local = await api(`/places/reverse?lat=${latitude}&lon=${longitude}`);
     } catch (falha) {
-      if (idBusca !== buscaPontoAtual.current) return;
-      const localAproximado = { ...ponto, nome: 'Ponto próximo ao local marcado', endereço: `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`, pontoAproximado: true };
-      definirSelecionado(localAproximado);
-      definirErro('');
-      const próximos = await carregarLocaisProximos(latitude, longitude, idBusca);
-      if (idBusca !== buscaPontoAtual.current) return;
-      const dados = await carregarItensDoDestino(localAproximado.nome, idBusca, próximos.categories);
-      if (idBusca === buscaPontoAtual.current) await sugerirItensComIA(localAproximado.nome, próximos, dados?.allRegisteredItems || [], idBusca);
+      // Se o servidor não achar um endereço mapeado, tenta o geocodificador do celular.
     }
+    if ((!local?.nome || !local?.endereço) && Platform.OS !== 'web') {
+      try {
+        const endereços = await Location.reverseGeocodeAsync({ latitude, longitude });
+        const endereço = endereços?.[0];
+        if (endereço) {
+          const rua = [endereço.street, endereço.streetNumber].filter(Boolean).join(', ');
+          const partes = [rua, endereço.district, endereço.city, endereço.region].filter(Boolean);
+          local = {
+            ...local,
+            nome: rua || endereço.name || endereço.district || endereço.city || 'Pino no ponto selecionado',
+            endereço: partes.join(', '),
+          };
+        }
+      } catch (falha) {
+        // As coordenadas exatas continuam disponíveis mesmo sem nome de rua.
+      }
+    }
+    if (idBusca !== buscaPontoAtual.current) return;
+    const localSelecionado = local?.nome && local?.endereço
+      ? { ...ponto, ...local, latitude, longitude }
+      : { ...ponto, nome: 'Pino no ponto selecionado', endereço: `Coordenada exata: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`, endereçoIndisponível: true };
+    definirSelecionado(localSelecionado);
+    definirErro('');
+    definirCepsDoEndereco(localSelecionado.cep ? [{ cep: localSelecionado.cep, bairro: localSelecionado.bairro || '' }] : []);
+    const próximosPromise = carregarLocaisProximos(latitude, longitude, idBusca);
+    const destino = [localSelecionado.nome, localSelecionado.endereço].filter(Boolean).join(', ').slice(0, 180);
+    const próximos = await próximosPromise;
+    if (idBusca !== buscaPontoAtual.current) return;
+    const dados = await carregarItensDoDestino(destino, idBusca, próximos.categories);
+    if (idBusca === buscaPontoAtual.current) await sugerirItensComIA(destino, próximos, dados?.allRegisteredItems || [], idBusca);
   }
 
   return (
@@ -370,7 +383,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
       />
       <Text style={estilos.atribuição}>Mapa © OpenStreetMap contributors · OpenFreeMap</Text>
       {selecionado ? <>
-        <View style={estilos.localSelecionado}><Ionicons name="location" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{selecionado.nome}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{selecionado.endereço}</Text>{selecionado.pontoAproximado ? <Text style={estilos.endereçoResultado}>Endereço exato indisponível; a recomendação usa os locais mapeados mais próximos.</Text> : selecionado.aproximado ? <Text style={estilos.endereçoResultado}>O CEP indica uma referência da rua/região. Para chegar ao número certo, toque no ponto desejado do mapa.</Text> : null}{selecionado.cep ? <Text style={estilos.textoCep}>CEP {selecionado.cep}</Text> : null}</View></View>
+        <View style={estilos.localSelecionado}><Ionicons name="location" size={18} color={cores.primario} /><View style={estilos.colunaResultado}><Text style={estilos.nomeResultado}>{selecionado.nome}</Text><Text style={estilos.endereçoResultado} numberOfLines={2}>{selecionado.endereço}</Text>{selecionado.endereçoIndisponível ? <Text style={estilos.endereçoResultado}>O marcador está nas coordenadas exatas acima; não há endereço cadastrado para esse ponto.</Text> : selecionado.aproximado ? <Text style={estilos.endereçoResultado}>O CEP indica uma referência da rua/região. Para chegar ao número certo, toque no ponto desejado do mapa.</Text> : null}{selecionado.cep ? <Text style={estilos.textoCep}>CEP {selecionado.cep}</Text> : null}</View></View>
         {locaisProximos.categories.length ? <View style={estilos.contextoProximo}><Text style={estilos.tituloContextoProximo}>O que existe por perto</Text><Text style={estilos.textoContextoProximo}>{locaisProximos.categories.join(' · ')}</Text>{locaisProximos.places.length ? <Text style={estilos.textoContextoProximo}>{locaisProximos.places.map(local => local.distancia != null ? `${local.nome} (${local.distancia} m)` : local.nome).join(' · ')}</Text> : null}</View> : null}
         {cepsDoEndereco.length > 1 ? <View style={estilos.cepsEncontrados}><Text style={estilos.endereçoResultado}>Mais de um CEP encontrado para este logradouro. Confira o bairro para escolher:</Text>{cepsDoEndereco.map(opção => <Pressable key={opção.cep} onPress={() => definirSelecionado(atual => ({ ...atual, cep: opção.cep, bairro: opção.bairro }))} style={[estilos.opcaoCep, selecionado.cep === opção.cep && estilos.opcaoCepAtiva]}><Text style={[estilos.textoOpcaoCep, selecionado.cep === opção.cep && estilos.textoOpcaoCepAtivo]}>{opção.cep}{opção.bairro ? ` · ${opção.bairro}` : ''}</Text></Pressable>)}</View> : null}
         <View style={estilos.cartaoSugestões}>
@@ -424,6 +437,7 @@ export default function TelaMapaRotina({ api, rotinaAtiva, abrirObjetos, notific
             {resultadoConferencia ? <View accessibilityRole="summary" style={estilos.resultadoConferencia}><View style={estilos.cabecalhoResultado}><Ionicons name="checkmark-circle" size={20} color={cores.verde} /><Text style={estilos.tituloResultado}>Plano de saída registrado</Text></View><Text style={estilos.textoResultado}>{resultadoConferencia.message}</Text>{resultadoConferencia.planned?.length ? <Text style={estilos.textoResultado}>Você planeja levar: {resultadoConferencia.planned.join(', ')}.</Text> : null}{resultadoConferencia.detected?.length ? <Text style={estilos.textoResultado}>Detectados pelo Bluetooth: {resultadoConferencia.detected.join(', ')}.</Text> : null}{resultadoConferencia.missing?.length ? <Text style={estilos.textoAlertaResultado}>Sem sinal do chaveiro: {resultadoConferencia.missing.join(', ')}. Confira esses itens manualmente.</Text> : null}{resultadoConferencia.expected?.length ? <Text style={estilos.textoResultado}>Lembretes para o destino: {resultadoConferencia.expected.join(', ')}.</Text> : null}</View> : null}
           </> : null}
         </View>
+        {selecionado.precisão != null ? <Text style={estilos.endereçoResultado}>Precisão informada pelo GPS: cerca de ±{Math.round(selecionado.precisão)} m.</Text> : null}
         {selecionado.nome !== 'Minha localização' ? <Botao título={salvando ? 'Salvando destino...' : 'Salvar destino na minha rotina'} ícone="calendar-outline" secundário carregando={salvando} aoPressionar={salvarNaRotina} /> : null}
       </> : null}
       <View style={estilos.rotina}>

@@ -2,6 +2,7 @@ import estilos from '../estilos/TelaBluetooth.estilos';
 import { useEffect, useRef, useState } from 'react';
 import { PermissionsAndroid, Platform, Pressable, ScrollView, Text, TextInput, View, type Permission } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import { Aviso, Botao, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
@@ -48,6 +49,22 @@ async function enviarComandoLambrie(dispositivo, comando) {
   for (const pacote of criarPacotesComandoLambrie(comando)) {
     await dispositivo.writeCharacteristicWithResponseForService(SERVIÇO_LEMBRIE, CARACTERÍSTICA_LEMBRIE, pacote);
   }
+}
+
+export async function enviarResumoPerimetroParaLambrie(resumo) {
+  const gerente = gerenteBluetoothCompartilhado;
+  const conexão = conexãoLambrieCompartilhada;
+  if (!gerente || !conexão) return false;
+  const dispositivo = (await gerente.devices([conexão.id]))[0] || await gerente.connectToDevice(conexão.id, { timeout: 5000 });
+  await dispositivo.discoverAllServicesAndCharacteristics();
+  for (const pacote of criarPacotesResumoLambrie(resumo)) {
+    await dispositivo.writeCharacteristicWithoutResponseForService(
+      SERVIÇO_LEMBRIE,
+      CARACTERÍSTICA_LEMBRIE,
+      pacote,
+    );
+  }
+  return true;
 }
 
 function aguardar(ms) {
@@ -111,7 +128,9 @@ export function habilitarMonitoramentoLambrie() {
 export default function TelaBluetooth({ objetos, definirObjetos, api, notificar, abrirObjetos, lerResumo = lerResumoSaidaBluetooth }) {
   const gerente = useRef(null);
   const temporizador = useRef(null);
+  const temporizadorReinicioBusca = useRef(null);
   const temporizadorSinal = useRef(null);
+  const buscaEmAndamento = useRef(false);
   const inscriçãoDesconexão = useRef(null);
   const inscriçãoCadastroChaveiro = useRef(null);
   const conexãoAtual = useRef(null);
@@ -256,6 +275,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       return () => {
         componenteAtivo.current = false;
         if (temporizador.current) clearTimeout(temporizador.current);
+        if (temporizadorReinicioBusca.current) clearTimeout(temporizadorReinicioBusca.current);
         if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
         try { novoGerente.stopDeviceScan(); } catch (falha) {}
         inscriçãoDesconexão.current?.remove();
@@ -274,9 +294,14 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
   }, []);
 
   function pararBusca() {
+    buscaEmAndamento.current = false;
     if (temporizador.current) {
       clearTimeout(temporizador.current);
       temporizador.current = null;
+    }
+    if (temporizadorReinicioBusca.current) {
+      clearTimeout(temporizadorReinicioBusca.current);
+      temporizadorReinicioBusca.current = null;
     }
     try {
       const resultado = gerente.current?.stopDeviceScan();
@@ -297,7 +322,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       if (componenteAtivo.current) {
         setDiagnostico(null);
         definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(objetoId) ? { ...item, connected: false } : item));
-        setErro('A conexão do chaveiro foi perdida. Se o buzzer estiver instalado, ele emitirá o alerta. Aproxime o dispositivo e toque em “Localizar chaveiro” para reconectar.');
+        setErro('A conexão Bluetooth foi perdida. Aproxime a placa e conecte novamente; o acionamento do buzzer está em preparação.');
       }
       api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: false }) }).catch(() => {});
     });
@@ -305,13 +330,20 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
 
   async function pedirPermissões() {
     if (Platform.OS !== 'android') return true;
+    if (Number(Platform.Version) < 31) {
+      const serviçosDeLocalizaçãoAtivos = await Location.hasServicesEnabledAsync().catch(() => true);
+      if (!serviçosDeLocalizaçãoAtivos) {
+        setErro('Ative a Localização/GPS do celular para procurar dispositivos Bluetooth neste Android.');
+        return false;
+      }
+    }
     const necessárias: Permission[] = Number(Platform.Version) >= 31
       ? ['android.permission.BLUETOOTH_SCAN', 'android.permission.BLUETOOTH_CONNECT']
       : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
     const resultados = await PermissionsAndroid.requestMultiple(necessárias);
     const recusadas = necessárias.filter((permissão) => resultados[permissão] !== PermissionsAndroid.RESULTS.GRANTED);
     if (recusadas.length) {
-      setErro('Permita o acesso ao Bluetooth nas configurações do Android para procurar o chaveiro.');
+      setErro('Permita Bluetooth e Localização nas configurações do Android e tente buscar novamente.');
       return false;
     }
     return true;
@@ -328,44 +360,80 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       return;
     }
 
+    if (buscaEmAndamento.current) return;
+    buscaEmAndamento.current = true;
     setErro('');
     setDispositivos([]);
     escolherDispositivo(null);
 
     try {
       const autorizado = await pedirPermissões();
-      if (!autorizado) return;
+      if (!autorizado) {
+        buscaEmAndamento.current = false;
+        return;
+      }
 
+      // Encerra qualquer busca anterior do gerenciador compartilhado e dá
+      // tempo para o Android liberar o scanner antes de iniciar outra.
+      try { await gerente.current.stopDeviceScan(); } catch (falha) {}
+      await new Promise((resolver) => setTimeout(resolver, 500));
       const estado = await gerente.current.state();
       setEstadoBluetooth(estado);
       if (estado !== 'PoweredOn') {
         setErro(estado === 'PoweredOff'
           ? 'Ative o Bluetooth do celular e toque em “Buscar dispositivos” novamente.'
           : 'O Bluetooth ainda não está pronto. Confira se está disponível e tente de novo.');
+        buscaEmAndamento.current = false;
         return;
       }
 
       setProcurando(true);
-      await gerente.current.startDeviceScan(null, { allowDuplicates: false }, (falha, dispositivo) => {
-        if (falha) {
-          setErro('A busca foi interrompida: ' + falha.message);
-          pararBusca();
-          return;
-        }
-        if (!dispositivo?.id) return;
-        const achado = {
-          id: dispositivo.id,
-          nome: dispositivo.name || dispositivo.localName || 'Dispositivo Bluetooth sem nome',
-          sinal: dispositivo.rssi,
+      const iniciarScanner = (tentativa = 0) => {
+        if (!buscaEmAndamento.current || !gerente.current) return;
+        const receberResultado = (falha, dispositivo) => {
+          if (falha) {
+            if (tentativa === 0 && /scan|scanning|scanner/i.test(falha.message || '')) {
+              try { gerente.current?.stopDeviceScan(); } catch (ignorada) {}
+              setErro('O Android não iniciou a busca. Vou reiniciar o scanner e tentar mais uma vez…');
+              temporizadorReinicioBusca.current = setTimeout(() => iniciarScanner(1), 800);
+              return;
+            }
+            setErro('A busca foi interrompida. Confirme se o Bluetooth e a Localização estão ligados e tente novamente.');
+            pararBusca();
+            return;
+          }
+          if (!dispositivo?.id) return;
+          setErro('');
+          const achado = {
+            id: dispositivo.id,
+            nome: dispositivo.name || dispositivo.localName || 'Dispositivo Bluetooth sem nome',
+            sinal: dispositivo.rssi,
+          };
+          setDispositivos((atuais) => {
+            const semDuplicados = atuais.filter((item) => item.id !== achado.id);
+            return [...semDuplicados, achado].sort((a, b) => (b.sinal ?? -100) - (a.sinal ?? -100));
+          });
         };
-        setDispositivos((atuais) => {
-          const semDuplicados = atuais.filter((item) => item.id !== achado.id);
-          return [...semDuplicados, achado].sort((a, b) => (b.sinal ?? -100) - (a.sinal ?? -100));
-        });
-      });
+        try {
+          gerente.current.startDeviceScan(null, { allowDuplicates: false }, receberResultado);
+        } catch (falha) {
+          if (tentativa === 0 && /scan|scanning|scanner/i.test(falha?.message || '')) {
+            try { gerente.current?.stopDeviceScan(); } catch (ignorada) {}
+            temporizadorReinicioBusca.current = setTimeout(() => iniciarScanner(1), 800);
+          } else {
+            setErro('O Android não conseguiu iniciar a busca. Feche outras telas que usam Bluetooth e tente novamente.');
+            pararBusca();
+          }
+        }
+      };
+      iniciarScanner();
       temporizador.current = setTimeout(pararBusca, 15000);
     } catch (falha) {
-      setErro('Não foi possível buscar dispositivos. Verifique o Bluetooth e tente novamente.');
+      buscaEmAndamento.current = false;
+      const detalhe = String(falha?.message || '').toLowerCase();
+      setErro(detalhe.includes('permission') || detalhe.includes('unauthorized')
+        ? 'O Android bloqueou a busca. Permita Bluetooth e, em aparelhos antigos, Localização; depois tente novamente.'
+        : 'Não foi possível iniciar a busca. Confirme que o Bluetooth do celular está ligado e tente novamente.');
       pararBusca();
     }
   }
@@ -699,7 +767,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
                 <View key={String(objeto.id)} style={estilos.itemAssociado}>
                   <CartaoObjeto objeto={objeto} compacto />
                   {objeto.connected ? <Text style={estilos.statusConectado}>Bluetooth conectado</Text> : <Text style={estilos.statusDesconectado}>Bluetooth desconectado</Text>}
-                  <Botao título={localizando ? 'Conectando para localizar...' : 'Localizar chaveiro'} ícone="volume-high-outline" aoPressionar={() => localizarChaveiro(objeto)} carregando={localizando} estilo={{ marginTop: 10 }} />
+                  <Botao título={localizando ? 'Preparando...' : 'Tocar buzzer (em preparação)'} ícone="volume-high-outline" aoPressionar={() => localizarChaveiro(objeto)} carregando={localizando} desativado estilo={{ marginTop: 10 }} />
                   {objeto.connected ? <Pressable accessibilityRole="button" onPress={() => desconectarDispositivo(objeto)} style={estilos.removerVinculo}><Ionicons name="bluetooth-outline" size={16} color={cores.primario} /><Text style={[estilos.textoRemoverVinculo, { color: cores.primario }]}>Desconectar</Text></Pressable> : null}
                   <Pressable accessibilityRole="button" onPress={() => removerAssociacao(objeto)} style={estilos.removerVinculo}><Ionicons name="unlink-outline" size={16} color={cores.vermelho} /><Text style={estilos.textoRemoverVinculo}>Desassociar dispositivo</Text></Pressable>
                 </View>

@@ -57,7 +57,7 @@ export function lerChecklistPerfil(perfil, somenteEssenciais = false) {
 export function criarResumoSaida(destino, lista) {
   return {
     destination: destino.trim(),
-    items: lista.filter((item) => item.essential && !item.conferido).map((item) => item.name),
+    items: lista.filter((item) => !item.sugestao && !item.conferido).map((item) => item.name),
     updatedAt: Date.now(),
   };
 }

@@ -1,14 +1,21 @@
 import estilos from '../estilos/TelaSaida.estilos';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView,  Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import ImagemObjeto from '../componentes/ImagemObjeto';
+import MapaLibre from '../componentes/MapaLibre';
 import { Aviso, Botao, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
 import { alternarItemConferido, criarDadosConferencia, criarListaSaida, criarResumoSaida, lerChecklistPerfil } from '../utilitarios/listaDeSaida';
 import { salvarResumoSaidaBluetooth } from '../utilitarios/resumoSaidaBluetooth';
+import { distanciaEmMetros } from '../utilitarios/perimetro';
+import { enviarResumoPerimetroParaLambrie } from './TelaBluetooth';
 
-export default function TelaSaida({ objetos, api, notificar, atualizarDados, somenteEssenciais, destinoInicial = '', salvarResumo = salvarResumoSaidaBluetooth }) {
+const CHAVE_PERIMETRO = '@lembre/perimetro';
+
+export default function TelaSaida({ objetos, api, notificar, atualizarDados, somenteEssenciais, destinoInicial = '', abrirObjetos = () => {}, salvarResumo = salvarResumoSaidaBluetooth }) {
   const [destino, definirDestino] = useState('');
   const [lista, definirLista] = useState([]);
   const [sugestoes, definirSugestoes] = useState([]);
@@ -18,6 +25,32 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
   const [conferindoSaida, definirConferindoSaida] = useState(false);
   const [resultadoSaida, definirResultadoSaida] = useState(null);
   const [erro, definirErro] = useState('');
+  const [centroPerimetro, definirCentroPerimetro] = useState(null);
+  const [nomeLocal, definirNomeLocal] = useState('Casa');
+  const [raioPerimetro, definirRaioPerimetro] = useState(200);
+  const [localSalvo, definirLocalSalvo] = useState(false);
+  const [monitorandoPerimetro, definirMonitorandoPerimetro] = useState(false);
+  const [estadoPerimetro, definirEstadoPerimetro] = useState('');
+  const assinaturaGPS = useRef(null);
+  const listaAtual = useRef(lista);
+  const jáEntrouNoPerimetro = useRef(false);
+  const leiturasFora = useRef(0);
+
+  useEffect(() => { listaAtual.current = lista; }, [lista]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(CHAVE_PERIMETRO).then((conteudo) => {
+      if (!conteudo) return;
+      const salvo = JSON.parse(conteudo);
+      if (Number.isFinite(salvo.latitude) && Number.isFinite(salvo.longitude)) {
+        definirCentroPerimetro({ latitude: salvo.latitude, longitude: salvo.longitude });
+        definirNomeLocal(salvo.nome || 'Casa');
+        definirRaioPerimetro(Number(salvo.raio) || 200);
+        definirLocalSalvo(true);
+      }
+    }).catch(() => {});
+    return () => assinaturaGPS.current?.remove();
+  }, []);
 
   useEffect(() => {
     api('/exit-profiles')
@@ -154,13 +187,133 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
       : '');
   }
 
+  async function marcarLocalAtual() {
+    definirErro('');
+    try {
+      const permissão = await Location.requestForegroundPermissionsAsync();
+      if (permissão.status !== 'granted') throw new Error('Permita a localização para cadastrar o local do perímetro.');
+      const posição = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      definirCentroPerimetro({ latitude: posição.coords.latitude, longitude: posição.coords.longitude });
+      definirLocalSalvo(false);
+      definirEstadoPerimetro('Pino colocado na sua localização atual. Ajuste no mapa e salve o local.');
+    } catch (falha) {
+      definirErro(falha.message || 'Não consegui obter sua localização. Ative o GPS e tente novamente.');
+    }
+  }
+
+  async function salvarLocalPerimetro() {
+    if (!centroPerimetro) {
+      definirErro('Marque o local no mapa ou use sua localização atual.');
+      return;
+    }
+    const registro = {
+      nome: nomeLocal.trim() || 'Local seguro',
+      latitude: centroPerimetro.latitude,
+      longitude: centroPerimetro.longitude,
+      raio: raioPerimetro,
+    };
+    await AsyncStorage.setItem(CHAVE_PERIMETRO, JSON.stringify(registro));
+    definirNomeLocal(registro.nome);
+    definirLocalSalvo(true);
+    definirEstadoPerimetro(`Local “${registro.nome}” salvo com perímetro de ${raioPerimetro} m.`);
+  }
+
+  function avisarSaidaDoPerimetro() {
+    assinaturaGPS.current?.remove();
+    assinaturaGPS.current = null;
+    definirMonitorandoPerimetro(false);
+    const pendentes = listaAtual.current.filter((item) => !item.sugestao && !item.conferido).map((item) => item.name);
+    const textoItens = pendentes.length ? `Confira se pegou: ${pendentes.join(', ')}.` : 'Seu checklist está marcado como completo.';
+    definirEstadoPerimetro(`Você saiu do perímetro de ${nomeLocal}. ${textoItens}`);
+    const resumo = { destination: nomeLocal, items: pendentes.length ? pendentes : ['Checklist completo'], updatedAt: Date.now() };
+    void enviarResumoPerimetroParaLambrie(resumo).catch(() => {});
+    if (Platform.OS === 'web') notificar(`Você saiu do perímetro de ${nomeLocal}. ${textoItens}`);
+    else Alert.alert(`Você saiu de ${nomeLocal}`, textoItens);
+  }
+
+  async function alternarMonitoramentoPerimetro() {
+    if (monitorandoPerimetro) {
+      assinaturaGPS.current?.remove();
+      assinaturaGPS.current = null;
+      definirMonitorandoPerimetro(false);
+      definirEstadoPerimetro('Aviso de perímetro pausado.');
+      return;
+    }
+    if (!localSalvo || !centroPerimetro) {
+      definirErro('Cadastre e salve o local do perímetro primeiro.');
+      return;
+    }
+    if (!lista.length) {
+      definirErro('Monte seu checklist antes de ativar o aviso.');
+      return;
+    }
+    try {
+      const permissão = await Location.requestForegroundPermissionsAsync();
+      if (permissão.status !== 'granted') throw new Error('Permita a localização para acompanhar o perímetro.');
+      const dentroInicial = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      jáEntrouNoPerimetro.current = distanciaEmMetros(centroPerimetro, dentroInicial.coords) <= raioPerimetro;
+      leiturasFora.current = 0;
+      const assinatura = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 15 },
+        (posição) => {
+          if (posição.coords.accuracy != null && posição.coords.accuracy > 100) return;
+          const metros = distanciaEmMetros(centroPerimetro, posição.coords);
+          if (metros <= raioPerimetro) {
+            jáEntrouNoPerimetro.current = true;
+            leiturasFora.current = 0;
+            definirEstadoPerimetro(`Dentro do perímetro de ${nomeLocal} · ${Math.round(metros)} m do centro.`);
+            return;
+          }
+          if (!jáEntrouNoPerimetro.current) {
+            definirEstadoPerimetro('Aguardando entrar no perímetro salvo para começar o aviso.');
+            return;
+          }
+          leiturasFora.current += 1;
+          definirEstadoPerimetro(`Verificando saída do perímetro · ${Math.round(metros)} m do centro.`);
+          if (metros > raioPerimetro + 25 && leiturasFora.current >= 2) avisarSaidaDoPerimetro();
+        },
+      );
+      assinaturaGPS.current = assinatura;
+      definirMonitorandoPerimetro(true);
+      definirErro('');
+      definirEstadoPerimetro(`Aviso ativo para ${nomeLocal}. Deixe o app aberto para monitorar a saída.`);
+    } catch (falha) {
+      definirErro(falha.message || 'Não foi possível iniciar o GPS. Confira as permissões e tente novamente.');
+    }
+  }
+
   return (
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
       <Text style={estilos.sobretitulo}>ROTINA</Text>
-      <Text style={estilos.titulo}>Antes de sair</Text>
-      <Text style={estilos.subtitulo}>Monte sua lista e marque os itens conferidos. A detecção por proximidade e os alertas dependem de um chaveiro Bluetooth compatível associado.</Text>
+      <Text style={estilos.titulo}>Checklist e perímetro</Text>
+      <Text style={estilos.subtitulo}>Cadastre o local de referência, escolha os objetos e receba um aviso se sair do perímetro antes de conferir a lista.</Text>
+
+      <View style={estilos.avisoPerimetro}>
+        <Ionicons name="information-circle" size={21} color={cores.primario} />
+        <Text style={estilos.textoAvisoPerimetro}>O aviso usa o GPS do celular e funciona enquanto esta tela do app ou site estiver aberta. A placa Lambrie não tem GPS próprio. O buzzer está em preparação; por enquanto, o alerta aparece no app e os itens pendentes podem ser enviados ao visor se houver conexão Bluetooth.</Text>
+      </View>
+
+      <View style={estilos.cartaoPerimetro}>
+        <Text style={estilos.tituloPerimetro}>1 · Cadastrar local de referência</Text>
+        <Text style={estilos.textoPerimetro}>Use sua localização atual quando estiver no local que deseja proteger, ou ajuste o pino no mapa.</Text>
+        <TextInput value={nomeLocal} onChangeText={(valor) => { definirNomeLocal(valor); definirLocalSalvo(false); }} placeholder="Ex.: Casa" placeholderTextColor={cores.textoSuave} maxLength={50} style={estilos.campoLocal} />
+        <Botao título="Usar minha localização atual" ícone="locate-outline" aoPressionar={marcarLocalAtual} secundário />
+        {centroPerimetro ? <MapaLibre latitude={centroPerimetro.latitude} longitude={centroPerimetro.longitude} aoEscolher={(latitude, longitude) => { definirCentroPerimetro({ latitude, longitude }); definirLocalSalvo(false); }} /> : null}
+        {centroPerimetro ? <Text style={estilos.textoPerimetro}>Centro: {centroPerimetro.latitude.toFixed(5)}, {centroPerimetro.longitude.toFixed(5)}</Text> : null}
+        <Text style={estilos.textoRaio}>Tamanho do perímetro</Text>
+        <View style={estilos.opcoesRaio}>{[100, 200, 500, 1000].map((raio) => <Pressable key={raio} accessibilityRole="radio" accessibilityState={{ selected: raioPerimetro === raio }} onPress={() => { definirRaioPerimetro(raio); definirLocalSalvo(false); }} style={[estilos.opcaoRaio, raioPerimetro === raio && estilos.opcaoRaioAtiva]}><Text style={[estilos.textoOpcaoRaio, raioPerimetro === raio && estilos.textoOpcaoRaioAtiva]}>{raio >= 1000 ? `${raio / 1000} km` : `${raio} m`}</Text></Pressable>)}</View>
+        <Botao título={localSalvo ? 'Local salvo' : 'Salvar local e perímetro'} ícone={localSalvo ? 'checkmark-circle-outline' : 'bookmark-outline'} aoPressionar={salvarLocalPerimetro} desativado={!centroPerimetro} />
+      </View>
+
+        <View style={estilos.avisoBuzzer}>
+        <Ionicons name="volume-high-outline" size={20} color={cores.laranja} />
+          <View style={{ flex: 1 }}><Text style={estilos.tituloAvisoBuzzer}>Buzzer em preparação</Text><Text style={estilos.textoAvisoBuzzer}>O acionamento pelo app ficará disponível depois que o buzzer for conectado. A função do buzzer está comentada no firmware por enquanto.</Text></View>
+          {/* Ação reservada: ligar ao comando BLE de buzzer depois da instalação do componente. */}
+          <Pressable accessibilityRole="button" accessibilityState={{ disabled: true }} disabled style={estilos.botaoBuzzerDesativado}><Text style={estilos.textoBotaoBuzzerDesativado}>Tocar buzzer</Text></Pressable>
+      </View>
 
       <Botao título={carregando ? 'Preparando sua lista...' : 'Montar lista de saída'} ícone="checkbox-outline" aoPressionar={montarLista} carregando={carregando} />
+      <Botao título="Cadastrar ou editar itens do checklist" ícone="add-circle-outline" aoPressionar={abrirObjetos} secundário />
 
       {perfis.length ? (
         <View>
@@ -187,6 +340,13 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
             <Text style={estilos.porcentagem}>{progresso}%</Text>
           </View>
           <View style={estilos.trilho}><View style={[estilos.progresso, { width: `${progresso}%` as `${number}%` }]} /></View>
+
+          <View style={estilos.cartaoMonitoramento}>
+            <Text style={estilos.tituloPerimetro}>2 · Checklist de saída</Text>
+            <Text style={estilos.textoPerimetro}>Desmarque os itens que ainda não pegou. Se sair do perímetro, o aviso mostrará esses itens.</Text>
+            {estadoPerimetro ? <Text accessibilityRole="status" style={estilos.estadoPerimetro}>{estadoPerimetro}</Text> : null}
+            <Botao título={monitorandoPerimetro ? 'Pausar aviso de perímetro' : 'Ativar aviso de perímetro'} ícone={monitorandoPerimetro ? 'pause-circle-outline' : 'shield-checkmark-outline'} aoPressionar={alternarMonitoramentoPerimetro} secundário={!monitorandoPerimetro} estilo={{ marginTop: 10 }} />
+          </View>
 
           {lista.map((item) => (
             <Pressable key={String(item.id)} accessibilityRole="checkbox" accessibilityState={{ checked: item.conferido }} onPress={() => alternarConferido(item.id)} style={estilos.itemLista}>
@@ -218,7 +378,7 @@ export default function TelaSaida({ objetos, api, notificar, atualizarDados, som
         <View style={estilos.cartaoOrientacao}>
           <View style={estilos.iconeOrientacao}><Ionicons name="hand-left-outline" size={22} color={cores.primario} /></View>
           <Text style={estilos.tituloOrientacao}>Uma conferência simples e confiável</Text>
-          <Text style={estilos.textoOrientacao}>A lista e a conferência manual funcionam sem chaveiro. A detecção de proximidade e os alertas de separação exigem um chaveiro Bluetooth compatível, ligado e associado.</Text>
+          <Text style={estilos.textoOrientacao}>Cadastre seus objetos para montar a lista. O aviso de perímetro usa o GPS do celular; o buzzer físico só poderá ser ativado depois de conectado à placa.</Text>
         </View>
       )}
       <View style={{ height: 24 }} />

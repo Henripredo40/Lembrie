@@ -520,7 +520,7 @@ export default function App() {
   } else if (tela === 'bluetooth') {
     conteúdo = <TelaBluetooth objetos={objetos} definirObjetos={definirObjetos} api={chamarApi} notificar={notificar} abrirObjetos={() => abrirTela('objetos')} />;
   } else if (tela === 'saida') {
-    conteúdo = <TelaSaida objetos={objetos} api={chamarApi} notificar={notificar} atualizarDados={() => carregarDados(true)} somenteEssenciais={preferênciaAtiva(preferências.essential_only)} destinoInicial={destinoInicial} />;
+    conteúdo = <TelaSaida objetos={objetos} api={chamarApi} notificar={notificar} atualizarDados={() => carregarDados(true)} somenteEssenciais={preferênciaAtiva(preferências.essential_only)} destinoInicial={destinoInicial} abrirObjetos={() => abrirTela('objetos')} />;
   } else if (tela === 'mapa') {
     conteúdo = <TelaMapaRotina api={chamarApi} rotinaAtiva={preferênciaAtiva(preferências.routine_enabled)} abrirObjetos={() => abrirTela('objetos')} notificar={notificar} atualizarDados={() => carregarDados(true)} />;
   } else if (tela === 'perfil') {
@@ -536,7 +536,7 @@ export default function App() {
   }
 
   const título = {
-    inicio: 'Início', objetos: 'Meus objetos', bluetooth: 'Bluetooth', saida: 'Antes de sair',
+    inicio: 'Início', objetos: 'Meus objetos', bluetooth: 'Bluetooth', saida: 'Checklist e perímetro',
     historico: 'Histórico', configuracoes: 'Configurações', mapa: 'Mapa e rotina', perfil: 'Meu perfil', acesso: 'Acesso e segurança', assistente: 'Ajuda com IA',
   }[tela] || 'Lembriê';
 
@@ -591,7 +591,7 @@ export default function App() {
             <ItemNavegação ativo={tela === 'inicio'} ícone="home-outline" íconeAtivo="home" rótulo="Início" aoPressionar={() => abrirTela('inicio')} />
             <ItemNavegação ativo={tela === 'objetos'} ícone="cube-outline" íconeAtivo="cube" rótulo="Objetos" aoPressionar={() => abrirTela('objetos')} />
             <ItemNavegação ativo={tela === 'bluetooth'} ícone="bluetooth-outline" íconeAtivo="bluetooth" rótulo="Bluetooth" aoPressionar={() => abrirTela('bluetooth')} />
-            <ItemNavegação ativo={tela === 'saida'} ícone="checkbox-outline" íconeAtivo="checkbox" rótulo="Saída" aoPressionar={() => abrirTela('saida')} />
+            <ItemNavegação ativo={tela === 'saida'} ícone="checkbox-outline" íconeAtivo="checkbox" rótulo="Checklist" aoPressionar={() => abrirTela('saida')} />
             <ItemNavegação ativo={menuAberto || ['mapa', 'historico', 'configuracoes', 'perfil', 'acesso', 'assistente'].includes(tela)} ícone="grid-outline" íconeAtivo="grid" rótulo="Mais" aoPressionar={() => definirMenuAberto(true)} />
           </View>
         </SafeAreaView>
