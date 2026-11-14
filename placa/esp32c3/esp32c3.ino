@@ -349,6 +349,28 @@ void drawLargeLogo(int16_t x, int16_t y) {
   }
 }
 
+void drawStartupScreen(uint8_t progress, const char *status) {
+  tft.fillScreen(COLOR_BACKGROUND);
+  tft.fillRoundRect(4, 4, 120, 120, 10, COLOR_CARD);
+  tft.drawRoundRect(4, 4, 120, 120, 10, COLOR_GREEN_LIGHT);
+  drawLargeLogo(34, 13);
+
+  tft.setTextColor(COLOR_GREEN_DARK);
+  tft.setTextSize(2);
+  tft.setCursor(22, 78);
+  tft.print("LEMBRIE");
+
+  tft.setTextSize(1);
+  tft.setTextColor(COLOR_MUTED);
+  const int16_t statusX = (128 - strlen(status) * 6) / 2;
+  tft.setCursor(statusX, 98);
+  tft.print(status);
+
+  tft.drawRoundRect(14, 111, 100, 7, 3, COLOR_GREEN_LIGHT);
+  const int16_t barWidth = (progress > 100 ? 100 : progress) * 92 / 100;
+  if (barWidth > 0) tft.fillRoundRect(18, 113, barWidth, 3, 2, COLOR_GREEN);
+}
+
 void drawChecklist() {
   screenIsMenu = false;
   showingDepartureAlert = false;
@@ -631,9 +653,10 @@ void setup() {
 
   tft.initR(INITR_144GREENTAB);
   tft.setRotation(0);
-  drawOverview();
+  drawStartupScreen(25, "Checklist carregado");
 
   BLEDevice::init(DEVICE_NAME);
+  drawStartupScreen(60, "Iniciando Bluetooth");
   bleServer = BLEDevice::createServer();
   bleServer->setCallbacks(new ServerCallbacks());
   BLEService *service = bleServer->createService(SERVICE_UUID);
@@ -654,6 +677,8 @@ void setup() {
   advertising->setScanResponse(true);
   BLEDevice::startAdvertising();
 
+  drawStartupScreen(100, "Tudo pronto!");
+  delay(400);
   drawOverview();
   Serial.println("Lambrie pronto. K1 troca de item e K2 abre o menu.");
 }
