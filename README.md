@@ -1,46 +1,37 @@
 # Lembriê
 
-Aplicativo para organizar objetos, preparar saídas e conectar um chaveiro Bluetooth.
+Aplicativo para cadastrar objetos, montar listas de saída e usar um chaveiro ESP32-C3.
 
-Novo no projeto? Comece pelo [guia para entender e alterar o código](GUIA_DO_PROJETO.md).
+## Rodar no computador
 
-## Rodar localmente
-
-Requisitos: Node.js com npm e Docker Desktop. Na raiz do projeto, execute:
+Instale Node.js, npm e Docker Desktop. Na raiz do projeto, execute:
 
 ```powershell
 .\iniciar-local.ps1
 ```
 
-O script inicia a API e o MySQL no Docker, prepara as dependências se necessário e abre o app web. Se ainda não existir, cria `mobile/.env` a partir do exemplo. Para parar o app, pressione `Ctrl+C`; para parar API e banco, execute `docker compose down`. `docker compose down -v` também apaga os dados locais.
-
-## Testes e verificações
-
-Execute os comandos dentro da pasta indicada:
-
-| Pasta | Comandos |
-| --- | --- |
-| `server` | `npm test`, `npm run typecheck`, `npm run build` |
-| `mobile` | `npm run test:componentes`, `npm run test:coverage`, `npm run typecheck` |
-
-O pipeline do GitHub executa testes, cobertura, verificação de tipos e build da API.
+O script inicia a API e o banco e abre o app web. Para parar o banco e a API, execute `docker compose down`.
 
 ## Pastas
 
-- `.github/workflows/`: pipeline de qualidade.
-- `docs/qualidade/`: relatórios e apresentação do projeto.
-- `firmware/esp32c3_lambrie/`: código e instruções da placa Bluetooth.
-- `mobile/src/`: telas, componentes, serviços, estilos e utilitários do app.
-- `server/src/`: API, rotas, serviços, autenticação e conexão com o banco.
-- `server/sql/`: estrutura inicial do banco.
-- `docker-compose.yml` e `render.yaml`: configuração local e publicação.
+- `aplicativo/codigo/`: telas, componentes, estilos e utilitários do app.
+- `servidor/codigo/`: API, rotas, serviços e configuração do banco.
+- `servidor/banco/`: esquema inicial do banco.
+- `placa/esp32c3/`: sketch e instruções da ESP32-C3.
+- `.github/workflows/`: verificações do GitHub.
 
-## Publicação e configurações
+## App, placa e avisos
 
-O arquivo `render.yaml` configura o site e a API no Render. A API publicada precisa das credenciais do TiDB Cloud com TLS; configure segredos no painel do serviço e nunca os inclua no Git. Para copiar dados locais, configure `server/.env.migrate` a partir do exemplo e execute `npm run migrate:cloud` em `server`.
+Em **Antes de sair**, marque **Lembrar** nos itens que quer ver na placa. Marque o quadradinho maior quando já tiver pegado o item. Ao sair do perímetro salvo, o celular gera uma notificação e só envia o aviso visual à placa se ela já estiver conectada por Bluetooth. O visor preto volta a mostrar o alerta e os itens marcados ainda não conferidos. A placa não tem GPS próprio. O buzzer está comentado e desativado por enquanto.
 
-Gemini é opcional e requer `GEMINI_API_KEY` na API. Sem a chave, o app mantém respostas locais. O mapa precisa de internet. Bluetooth físico funciona somente no app Android/iOS nativo, com firmware e chaveiro compatíveis.
+Para ativar o acompanhamento em segundo plano, permita localização “o tempo todo” e notificações quando o app pedir. O sistema do celular monitora o perímetro mesmo com o app em outra tela; o envio à placa depende da conexão Bluetooth estar ativa.
 
-## Observação sobre dados
+K1 avança pelos itens; segurar K1 por cerca de um segundo apaga ou reacende a tela. K2 abre o menu. No menu, 1 clique desce, 2 cliques sobem e 3 cliques confirmam. O atalho K1+K2 também alterna a tela.
 
-Enquanto está aberto, o app envia a localização à API para reconhecer lugares e guarda apenas nomes aproximados por até 90 dias. Se Gemini estiver ativado, a pergunta e o contexto necessário são enviados ao Google. O firmware e o protocolo Bluetooth estão explicados em `firmware/esp32c3_lambrie/README.md`.
+O firmware guarda a última lista na memória interna da placa. Reiniciar ou desligar não apaga os itens; uma nova lista enviada pelo app substitui a anterior.
+
+## Publicação e configuração
+
+`render.yaml` configura o site e a API no Render. A API publicada precisa das credenciais do banco com TLS. Configure `GEMINI_API_KEY` no Render para ativar as respostas do Gemini; sem a chave, o app usa as respostas locais.
+
+Os perímetros salvos ficam no celular até serem editados ou removidos. O mapa usa dados do OpenStreetMap. Veja as instruções da [placa](placa/esp32c3/README.md).

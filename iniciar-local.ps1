@@ -14,15 +14,15 @@ if ($LASTEXITCODE -ne 0) {
   throw 'Não foi possível iniciar o banco e a API. Confira se o Docker Desktop está aberto.'
 }
 
-$mobile = Join-Path $raiz 'mobile'
-$envMobile = Join-Path $mobile '.env'
-if (-not (Test-Path -LiteralPath $envMobile)) {
-  Copy-Item -LiteralPath (Join-Path $mobile '.env.example') -Destination $envMobile
+$aplicativo = Join-Path $raiz 'aplicativo'
+$envAplicativo = Join-Path $aplicativo '.env'
+if (-not (Test-Path -LiteralPath $envAplicativo)) {
+  Copy-Item -LiteralPath (Join-Path $aplicativo '.env.example') -Destination $envAplicativo
 }
 
-Push-Location $mobile
+Push-Location $aplicativo
 try {
-  if (-not (Test-Path -LiteralPath (Join-Path $mobile 'node_modules'))) {
+  if (-not (Test-Path -LiteralPath (Join-Path $aplicativo 'node_modules'))) {
     npm ci
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao instalar as dependências do app.' }
   }

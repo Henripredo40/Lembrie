@@ -19,19 +19,19 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: servidor/package-lock.json
       - name: Instalar dependências da API
         run: npm ci
-        working-directory: server
+        working-directory: servidor
       - name: Executar testes e cobertura da API
         run: npm run test:coverage
-        working-directory: server
+        working-directory: servidor
       - name: Verificar tipos da API
         run: npm run typecheck
-        working-directory: server
+        working-directory: servidor
       - name: Compilar a API
         run: npm run build
-        working-directory: server
+        working-directory: servidor
 
   aplicativo:
     name: App — testes, cobertura e tipos
@@ -44,13 +44,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache-dependency-path: aplicativo/package-lock.json
       - name: Instalar dependências do app
         run: npm ci
-        working-directory: mobile
+        working-directory: aplicativo
       - name: Executar testes e cobertura do app
         run: npm run test:coverage
-        working-directory: mobile
+        working-directory: aplicativo
       - name: Verificar tipos do app
         run: npm run typecheck
-        working-directory: mobile
+        working-directory: aplicativo

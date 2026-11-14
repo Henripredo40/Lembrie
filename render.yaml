@@ -2,7 +2,7 @@ services:
   - type: web
     name: lembre-api
     runtime: node
-    rootDir: server
+    rootDir: servidor
     plan: free
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start:prod
@@ -33,7 +33,7 @@ services:
   - type: web
     name: lembre-web
     runtime: static
-    rootDir: mobile
+    rootDir: aplicativo
     buildCommand: npm ci --include=dev && npm run build:web
     staticPublishPath: dist
     routes:

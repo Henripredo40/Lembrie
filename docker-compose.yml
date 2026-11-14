@@ -19,7 +19,7 @@ services:
 
   api:
     build:
-      context: ./server
+      context: ./servidor
     restart: unless-stopped
     environment:
       NODE_ENV: development

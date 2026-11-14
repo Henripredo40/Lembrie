@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "moduleDetection": "force",
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "codigo",
+    "sourceMap": true
+  },
+  "include": ["codigo/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
