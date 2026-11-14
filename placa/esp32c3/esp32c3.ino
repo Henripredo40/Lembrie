@@ -234,7 +234,13 @@ void loadSavedChecklist() {
 }
 
 void confirmCurrentItem() {
-  if (!itemCount || currentItem >= itemCount) return;
+  if (!itemCount) {
+    currentItem = 0;
+    itemPage = 0;
+    drawChecklist();
+    return;
+  }
+  if (currentItem >= itemCount) return;
   const size_t checkedIndex = currentItem;
   for (size_t i = checkedIndex; i + 1 < itemCount; i++) items[i] = items[i + 1];
   itemCount--;
