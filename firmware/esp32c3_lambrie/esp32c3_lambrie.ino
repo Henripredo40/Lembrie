@@ -24,7 +24,7 @@ static const size_t MAX_MESSAGE = 480;
 static const size_t MAX_ITEMS = 20;
 static const size_t MAX_TEXT_LINES = 10;
 static const size_t CHARS_PER_LINE = 17;
-static const size_t LINES_PER_PAGE = 3;
+static const size_t LINES_PER_PAGE = 5;
 
 static const uint16_t COLOR_BACKGROUND = 0xF7DE;
 static const uint16_t COLOR_CARD = 0xFFFF;
@@ -46,9 +46,7 @@ size_t itemPage = 0;
 size_t menuOption = 0;
 bool messageReady = false;
 volatile bool bluetoothOn = true;
-volatile bool bluetoothConnected = false;
 bool screenIsMenu = false;
-volatile bool screenNeedsRefresh = false;
 
 struct Button {
   int pin;
@@ -97,14 +95,7 @@ class DataCallbacks : public BLECharacteristicCallbacks {
 };
 
 class ServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer *server) override {
-    bluetoothConnected = true;
-    screenNeedsRefresh = true;
-  }
-
   void onDisconnect(BLEServer *server) override {
-    bluetoothConnected = false;
-    screenNeedsRefresh = true;
     if (bluetoothOn) BLEDevice::startAdvertising();
   }
 };
@@ -239,25 +230,18 @@ void drawChecklist() {
   else snprintf(counter, sizeof(counter), "--/--");
   drawHeader("LEMBRIE", counter);
 
-  tft.fillRoundRect(7, 32, 114, 15, 7, COLOR_GREEN_LIGHT);
-  tft.fillCircle(16, 39, 3, bluetoothOn ? COLOR_GREEN : ST77XX_RED);
-  tft.setTextSize(1);
-  tft.setTextColor(COLOR_GREEN_DARK);
-  tft.setCursor(24, 35);
-  tft.print(bluetoothConnected ? "BLE CONECTADO" : bluetoothOn ? "BLUETOOTH ATIVO" : "BLE PAUSADO");
-
-  tft.fillRoundRect(5, 52, 118, 56, COLOR_CARD);
-  tft.drawRoundRect(5, 52, 118, 56, 8, COLOR_GREEN_LIGHT);
+  tft.fillRoundRect(5, 32, 118, 76, 8, COLOR_CARD);
+  tft.drawRoundRect(5, 32, 118, 76, 8, COLOR_GREEN_LIGHT);
   tft.setTextColor(COLOR_MUTED);
-  tft.setCursor(11, 58);
+  tft.setCursor(11, 39);
   tft.print(itemCount ? "OBJETO PENDENTE" : "CHECKLIST");
 
   if (!itemCount) {
     tft.setTextColor(COLOR_TEXT);
-    tft.setCursor(11, 76);
+    tft.setCursor(11, 61);
     tft.print("Sem item pendente.");
     tft.setTextColor(COLOR_MUTED);
-    tft.setCursor(11, 91);
+    tft.setCursor(11, 76);
     tft.print("Atualize pelo app.");
   } else {
     String lines[MAX_TEXT_LINES];
@@ -268,7 +252,7 @@ void drawChecklist() {
     const size_t firstLine = itemPage * LINES_PER_PAGE;
     tft.setTextColor(COLOR_TEXT);
     for (size_t i = 0; i < LINES_PER_PAGE && firstLine + i < lineCount; i++) {
-      tft.setCursor(11, 73 + i * 9);
+      tft.setCursor(11, 53 + i * 9);
       tft.print(lines[firstLine + i]);
     }
     if (pageCount > 1) {
@@ -406,12 +390,6 @@ void loop() {
       drawChecklist();
       Serial.println("Checklist atualizado pelo aplicativo.");
     }
-  }
-
-  if (screenNeedsRefresh) {
-    screenNeedsRefresh = false;
-    if (screenIsMenu) drawMenu();
-    else drawChecklist();
   }
 
   delay(20);
