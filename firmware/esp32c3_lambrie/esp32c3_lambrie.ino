@@ -22,6 +22,18 @@ static const char *EVENT_UUID = "6f6d0003-7a52-4f6c-9a21-4c454d425249";
 static const char *DEVICE_NAME = "Lambrie ESP32C3";
 static const size_t MAX_MESSAGE = 480;
 static const size_t MAX_ITEMS = 20;
+static const size_t MAX_TEXT_LINES = 10;
+static const size_t CHARS_PER_LINE = 17;
+static const size_t LINES_PER_PAGE = 3;
+
+static const uint16_t COLOR_BACKGROUND = 0xF7DE;
+static const uint16_t COLOR_CARD = 0xFFFF;
+static const uint16_t COLOR_TEXT = 0x2185;
+static const uint16_t COLOR_GREEN = 0x13CD;
+static const uint16_t COLOR_GREEN_DARK = 0x12EA;
+static const uint16_t COLOR_GREEN_LIGHT = 0xE7BE;
+static const uint16_t COLOR_GREEN_SOFT = 0xDFF3;
+static const uint16_t COLOR_MUTED = 0x6DB5;
 
 Adafruit_ST7735 tft(TFT_CS, TFT_DC, TFT_MOSI, TFT_SCLK, TFT_RST);
 BLEServer *bleServer = nullptr;
@@ -30,10 +42,13 @@ String receivedMessage;
 String items[MAX_ITEMS];
 size_t itemCount = 0;
 size_t currentItem = 0;
+size_t itemPage = 0;
 size_t menuOption = 0;
 bool messageReady = false;
-bool bluetoothOn = true;
+volatile bool bluetoothOn = true;
+volatile bool bluetoothConnected = false;
 bool screenIsMenu = false;
+volatile bool screenNeedsRefresh = false;
 
 struct Button {
   int pin;
@@ -82,7 +97,14 @@ class DataCallbacks : public BLECharacteristicCallbacks {
 };
 
 class ServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer *server) override {
+    bluetoothConnected = true;
+    screenNeedsRefresh = true;
+  }
+
   void onDisconnect(BLEServer *server) override {
+    bluetoothConnected = false;
+    screenNeedsRefresh = true;
     if (bluetoothOn) BLEDevice::startAdvertising();
   }
 };
@@ -111,6 +133,7 @@ String jsonString(const String &json, const char *key) {
 void loadItems(const String &text) {
   itemCount = 0;
   currentItem = 0;
+  itemPage = 0;
   int start = 0;
   while (start <= text.length() && itemCount < MAX_ITEMS) {
     int end = text.indexOf(',', start);
@@ -125,64 +148,162 @@ void loadItems(const String &text) {
   }
 }
 
-void drawChecklist() {
-  screenIsMenu = false;
-  tft.fillScreen(ST77XX_BLACK);
-  tft.setTextWrap(true);
-  tft.setTextSize(1);
-  tft.setTextColor(ST77XX_CYAN);
-  tft.setCursor(4, 5);
-  tft.println("LEMBRIE | CHECKLIST");
-  tft.drawFastHLine(4, 18, 120, ST77XX_BLUE);
+String displayText(String text) {
+  text.replace("á", "a"); text.replace("à", "a"); text.replace("â", "a"); text.replace("ã", "a"); text.replace("ä", "a");
+  text.replace("Á", "A"); text.replace("À", "A"); text.replace("Â", "A"); text.replace("Ã", "A"); text.replace("Ä", "A");
+  text.replace("é", "e"); text.replace("è", "e"); text.replace("ê", "e"); text.replace("ë", "e");
+  text.replace("É", "E"); text.replace("È", "E"); text.replace("Ê", "E"); text.replace("Ë", "E");
+  text.replace("í", "i"); text.replace("ì", "i"); text.replace("î", "i"); text.replace("ï", "i");
+  text.replace("Í", "I"); text.replace("Ì", "I"); text.replace("Î", "I"); text.replace("Ï", "I");
+  text.replace("ó", "o"); text.replace("ò", "o"); text.replace("ô", "o"); text.replace("õ", "o"); text.replace("ö", "o");
+  text.replace("Ó", "O"); text.replace("Ò", "O"); text.replace("Ô", "O"); text.replace("Õ", "O"); text.replace("Ö", "O");
+  text.replace("ú", "u"); text.replace("ù", "u"); text.replace("û", "u"); text.replace("ü", "u");
+  text.replace("Ú", "U"); text.replace("Ù", "U"); text.replace("Û", "U"); text.replace("Ü", "U");
+  text.replace("ç", "c"); text.replace("Ç", "C");
+  return text;
+}
 
-  if (itemCount == 0) {
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setCursor(4, 34);
-    tft.println("Nenhum item pendente.");
-    tft.setCursor(4, 52);
-    tft.println("Cadastre e confira os");
-    tft.println("objetos pelo aplicativo.");
-  } else {
-    tft.setTextColor(ST77XX_YELLOW);
-    tft.setCursor(4, 28);
-    tft.print("ITEM ");
-    tft.print(currentItem + 1);
-    tft.print(" DE ");
-    tft.println(itemCount);
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setCursor(4, 48);
-    tft.println(items[currentItem]);
+void splitItemIntoLines(String text, String lines[], size_t &lineCount) {
+  text = displayText(text);
+  text.trim();
+  lineCount = 0;
+  String line;
+  size_t start = 0;
+
+  while (start < text.length() && lineCount < MAX_TEXT_LINES) {
+    while (start < text.length() && text[start] == ' ') start++;
+    if (start >= text.length()) break;
+    int end = text.indexOf(' ', start);
+    if (end < 0) end = text.length();
+    String word = text.substring(start, end);
+
+    while (word.length() > CHARS_PER_LINE && lineCount < MAX_TEXT_LINES) {
+      if (line.length()) {
+        lines[lineCount++] = line;
+        line = "";
+        if (lineCount >= MAX_TEXT_LINES) break;
+      }
+      lines[lineCount++] = word.substring(0, CHARS_PER_LINE);
+      word = word.substring(CHARS_PER_LINE);
+    }
+    if (lineCount >= MAX_TEXT_LINES) break;
+    if (word.length()) {
+      if (line.length() && line.length() + 1 + word.length() > CHARS_PER_LINE) {
+        lines[lineCount++] = line;
+        line = "";
+      }
+      if (line.length()) line += ' ';
+      line += word;
+    }
+    start = end + 1;
   }
 
-  tft.setTextColor(ST77XX_GREEN);
-  tft.setCursor(4, 98);
-  tft.println(bluetoothOn ? "Bluetooth ligado" : "Bluetooth desligado");
-  tft.setTextColor(ST77XX_CYAN);
-  tft.setCursor(4, 114);
-  tft.println("K1: proximo  K2: menu");
+  if (line.length() && lineCount < MAX_TEXT_LINES) lines[lineCount++] = line;
+  if (!lineCount) lines[lineCount++] = "(sem nome)";
+}
+
+size_t getItemPageCount() {
+  String lines[MAX_TEXT_LINES];
+  size_t lineCount = 0;
+  splitItemIntoLines(itemCount ? items[currentItem] : "", lines, lineCount);
+  return (lineCount + LINES_PER_PAGE - 1) / LINES_PER_PAGE;
+}
+
+void drawHeader(const char *title, const char *counter) {
+  tft.fillScreen(COLOR_BACKGROUND);
+  tft.fillRect(0, 0, 128, 27, COLOR_GREEN);
+  tft.setTextWrap(false);
+  tft.setTextColor(COLOR_CARD);
+  tft.setTextSize(2);
+  tft.setCursor(7, 5);
+  tft.print(title);
+  tft.setTextSize(1);
+  tft.setCursor(96, 10);
+  tft.print(counter);
+}
+
+void drawFooter(const char *left, const char *right) {
+  tft.fillRoundRect(4, 111, 120, 15, 6, COLOR_GREEN_LIGHT);
+  tft.setTextSize(1);
+  tft.setTextColor(COLOR_GREEN_DARK);
+  tft.setCursor(8, 115);
+  tft.print(left);
+  tft.setCursor(82, 115);
+  tft.print(right);
+}
+
+void drawChecklist() {
+  screenIsMenu = false;
+  char counter[8];
+  if (itemCount) snprintf(counter, sizeof(counter), "%u/%u", (unsigned)(currentItem + 1), (unsigned)itemCount);
+  else snprintf(counter, sizeof(counter), "--/--");
+  drawHeader("LEMBRIE", counter);
+
+  tft.fillRoundRect(7, 32, 114, 15, 7, COLOR_GREEN_LIGHT);
+  tft.fillCircle(16, 39, 3, bluetoothOn ? COLOR_GREEN : ST77XX_RED);
+  tft.setTextSize(1);
+  tft.setTextColor(COLOR_GREEN_DARK);
+  tft.setCursor(24, 35);
+  tft.print(bluetoothConnected ? "BLE CONECTADO" : bluetoothOn ? "BLUETOOTH ATIVO" : "BLE PAUSADO");
+
+  tft.fillRoundRect(5, 52, 118, 56, COLOR_CARD);
+  tft.drawRoundRect(5, 52, 118, 56, 8, COLOR_GREEN_LIGHT);
+  tft.setTextColor(COLOR_MUTED);
+  tft.setCursor(11, 58);
+  tft.print(itemCount ? "OBJETO PENDENTE" : "CHECKLIST");
+
+  if (!itemCount) {
+    tft.setTextColor(COLOR_TEXT);
+    tft.setCursor(11, 76);
+    tft.print("Sem item pendente.");
+    tft.setTextColor(COLOR_MUTED);
+    tft.setCursor(11, 91);
+    tft.print("Atualize pelo app.");
+  } else {
+    String lines[MAX_TEXT_LINES];
+    size_t lineCount = 0;
+    splitItemIntoLines(items[currentItem], lines, lineCount);
+    const size_t pageCount = (lineCount + LINES_PER_PAGE - 1) / LINES_PER_PAGE;
+    if (itemPage >= pageCount) itemPage = pageCount - 1;
+    const size_t firstLine = itemPage * LINES_PER_PAGE;
+    tft.setTextColor(COLOR_TEXT);
+    for (size_t i = 0; i < LINES_PER_PAGE && firstLine + i < lineCount; i++) {
+      tft.setCursor(11, 73 + i * 9);
+      tft.print(lines[firstLine + i]);
+    }
+    if (pageCount > 1) {
+      tft.setTextColor(COLOR_GREEN);
+      tft.setCursor(68, 98);
+      tft.print("PARTE ");
+      tft.print(itemPage + 1);
+      tft.print("/");
+      tft.print(pageCount);
+    }
+  }
+
+  drawFooter("K1: AVANCA", "K2: MENU");
 }
 
 void drawMenu() {
   screenIsMenu = true;
-  tft.fillScreen(ST77XX_BLACK);
-  tft.setTextWrap(false);
+  drawHeader("MENU", "");
   tft.setTextSize(1);
-  tft.setTextColor(ST77XX_CYAN);
-  tft.setCursor(4, 6);
-  tft.println("MENU LEMBRIE");
-  tft.drawFastHLine(4, 18, 120, ST77XX_BLUE);
 
-  const char *options[] = { bluetoothOn ? "Desligar Bluetooth" : "Ligar Bluetooth", "Voltar ao checklist" };
+  const char *options[] = {
+    bluetoothOn ? "BLE: ligado" : "BLE: pausado",
+    "Voltar checklist"
+  };
   for (size_t i = 0; i < 2; i++) {
-    tft.setCursor(4, 42 + i * 24);
-    tft.setTextColor(i == menuOption ? ST77XX_YELLOW : ST77XX_WHITE);
+    const int y = 39 + i * 35;
+    const uint16_t background = i == menuOption ? COLOR_GREEN : COLOR_CARD;
+    const uint16_t foreground = i == menuOption ? COLOR_CARD : COLOR_TEXT;
+    tft.fillRoundRect(6, y, 116, 29, 8, background);
+    tft.setTextColor(foreground);
+    tft.setCursor(12, y + 11);
     tft.print(i == menuOption ? "> " : "  ");
-    tft.println(options[i]);
+    tft.print(options[i]);
   }
-  tft.setTextColor(ST77XX_CYAN);
-  tft.setCursor(4, 104);
-  tft.println("K1: escolher");
-  tft.println("K2: confirmar");
+  drawFooter("K1: MOVER", "K2: OK");
 }
 
 void toggleBluetooth() {
@@ -215,7 +336,13 @@ void handleButtons() {
   if (!next && !select) return;
 
   if (!screenIsMenu) {
-    if (next && itemCount > 0) currentItem = (currentItem + 1) % itemCount;
+    if (next && itemCount > 0) {
+      if (itemPage + 1 < getItemPageCount()) itemPage++;
+      else {
+        currentItem = (currentItem + 1) % itemCount;
+        itemPage = 0;
+      }
+    }
     else if (select) { menuOption = 0; drawMenu(); return; }
     drawChecklist();
     return;
@@ -279,6 +406,12 @@ void loop() {
       drawChecklist();
       Serial.println("Checklist atualizado pelo aplicativo.");
     }
+  }
+
+  if (screenNeedsRefresh) {
+    screenNeedsRefresh = false;
+    if (screenIsMenu) drawMenu();
+    else drawChecklist();
   }
 
   delay(20);
