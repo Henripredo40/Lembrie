@@ -493,21 +493,38 @@ void drawMenuOption(size_t option) {
     "Apagar tela"
   };
   const int y = 29 + option * 13;
-  const uint16_t background = option == menuOption ? COLOR_GREEN : COLOR_CARD;
-  const uint16_t foreground = option == menuOption ? COLOR_CARD : COLOR_TEXT;
-  tft.fillRoundRect(6, y, 116, 12, 4, background);
+  tft.fillRect(20, y + 1, 100, 10, COLOR_CARD);
   tft.setTextSize(1);
-  tft.setTextColor(foreground);
-  tft.setCursor(12, y + 2);
-  tft.print(option == menuOption ? "> " : "  ");
+  tft.setTextColor(COLOR_TEXT);
+  tft.setCursor(22, y + 2);
   tft.print(options[option]);
+}
+
+void drawMenuMarker(size_t option) {
+  const int y = 31 + option * 13;
+  tft.fillTriangle(8, y, 16, y + 5, 8, y + 10, COLOR_GREEN_DARK);
+}
+
+void animateMenuSelection(size_t previousOption, size_t nextOption) {
+  const int startY = 31 + previousOption * 13;
+  const int endY = 31 + nextOption * 13;
+  int markerY = startY;
+  for (int step = 1; step <= 4; step++) {
+    const int nextY = startY + (endY - startY) * step / 4;
+    tft.fillRect(7, markerY, 10, 11, COLOR_CARD);
+    tft.fillTriangle(8, nextY, 16, nextY + 5, 8, nextY + 10, COLOR_GREEN_DARK);
+    markerY = nextY;
+    delay(12);
+  }
 }
 
 void drawMenu() {
   screenIsMenu = true;
   if (!displayIsOn) return;
   drawHeader("MENU", "");
+  tft.fillRoundRect(4, 28, 120, 80, 8, COLOR_CARD);
   for (size_t i = 0; i < 6; i++) drawMenuOption(i);
+  drawMenuMarker(menuOption);
   tft.fillRoundRect(4, 111, 120, 15, 6, COLOR_GREEN_LIGHT);
   tft.setTextSize(1);
   tft.setTextColor(COLOR_GREEN_DARK);
@@ -616,15 +633,15 @@ void handleButtons() {
     if (screenIsMenu) {
       if (clicks == 1) {
         if (menuOption < 5) {
-          const size_t previousOption = menuOption++;
-          drawMenuOption(previousOption);
-          drawMenuOption(menuOption);
+          const size_t previousOption = menuOption;
+          menuOption++;
+          animateMenuSelection(previousOption, menuOption);
         }
       } else if (clicks == 2) {
         if (menuOption > 0) {
-          const size_t previousOption = menuOption--;
-          drawMenuOption(previousOption);
-          drawMenuOption(menuOption);
+          const size_t previousOption = menuOption;
+          menuOption--;
+          animateMenuSelection(previousOption, menuOption);
         }
       } else if (menuOption == 0) {
         toggleBluetooth();
