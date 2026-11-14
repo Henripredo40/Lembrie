@@ -230,7 +230,7 @@ void drawChecklist() {
   else snprintf(counter, sizeof(counter), "--/--");
   drawHeader("LEMBRIE", counter);
 
-  tft.fillRoundRect(5, 32, 118, 76, COLOR_CARD);
+  tft.fillRoundRect(5, 32, 118, 76, 8, COLOR_CARD);
   tft.drawRoundRect(5, 32, 118, 76, 8, COLOR_GREEN_LIGHT);
   tft.setTextColor(COLOR_MUTED);
   tft.setCursor(11, 39);
