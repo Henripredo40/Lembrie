@@ -483,12 +483,7 @@ void drawDepartureAlert() {
   drawFooter("K1: PROX", "K2:MENU");
 }
 
-void drawMenu() {
-  screenIsMenu = true;
-  if (!displayIsOn) return;
-  drawHeader("MENU", "");
-  tft.setTextSize(1);
-
+void drawMenuOption(size_t option) {
   const char *options[] = {
     bluetoothOn ? "BLE: ligado" : "BLE: pausado",
     "Voltar resumo",
@@ -497,16 +492,22 @@ void drawMenu() {
     "Conferir item",
     "Apagar tela"
   };
-  for (size_t i = 0; i < 6; i++) {
-    const int y = 29 + i * 13;
-    const uint16_t background = i == menuOption ? COLOR_GREEN : COLOR_CARD;
-    const uint16_t foreground = i == menuOption ? COLOR_CARD : COLOR_TEXT;
-    tft.fillRoundRect(6, y, 116, 12, 4, background);
-    tft.setTextColor(foreground);
-    tft.setCursor(12, y + 2);
-    tft.print(i == menuOption ? "> " : "  ");
-    tft.print(options[i]);
-  }
+  const int y = 29 + option * 13;
+  const uint16_t background = option == menuOption ? COLOR_GREEN : COLOR_CARD;
+  const uint16_t foreground = option == menuOption ? COLOR_CARD : COLOR_TEXT;
+  tft.fillRoundRect(6, y, 116, 12, 4, background);
+  tft.setTextSize(1);
+  tft.setTextColor(foreground);
+  tft.setCursor(12, y + 2);
+  tft.print(option == menuOption ? "> " : "  ");
+  tft.print(options[option]);
+}
+
+void drawMenu() {
+  screenIsMenu = true;
+  if (!displayIsOn) return;
+  drawHeader("MENU", "");
+  for (size_t i = 0; i < 6; i++) drawMenuOption(i);
   tft.fillRoundRect(4, 111, 120, 15, 6, COLOR_GREEN_LIGHT);
   tft.setTextSize(1);
   tft.setTextColor(COLOR_GREEN_DARK);
@@ -524,7 +525,7 @@ void toggleBluetooth() {
       bleServer->disconnect(bleServer->getConnId());
     }
   }
-  drawMenu();
+  drawMenuOption(menuOption);
 }
 
 void toggleDisplay() {
@@ -614,11 +615,17 @@ void handleButtons() {
     k2ClickCount = 0;
     if (screenIsMenu) {
       if (clicks == 1) {
-        if (menuOption < 5) menuOption++;
-        drawMenu();
+        if (menuOption < 5) {
+          const size_t previousOption = menuOption++;
+          drawMenuOption(previousOption);
+          drawMenuOption(menuOption);
+        }
       } else if (clicks == 2) {
-        if (menuOption > 0) menuOption--;
-        drawMenu();
+        if (menuOption > 0) {
+          const size_t previousOption = menuOption--;
+          drawMenuOption(previousOption);
+          drawMenuOption(menuOption);
+        }
       } else if (menuOption == 0) {
         toggleBluetooth();
       } else if (menuOption == 1) {
