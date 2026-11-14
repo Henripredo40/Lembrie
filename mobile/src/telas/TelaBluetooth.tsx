@@ -128,7 +128,9 @@ export function habilitarMonitoramentoLambrie() {
 export default function TelaBluetooth({ objetos, definirObjetos, api, notificar, abrirObjetos, lerResumo = lerResumoSaidaBluetooth }) {
   const gerente = useRef(null);
   const temporizador = useRef(null);
+  const temporizadorReinicioBusca = useRef(null);
   const temporizadorSinal = useRef(null);
+  const buscaEmAndamento = useRef(false);
   const inscriçãoDesconexão = useRef(null);
   const inscriçãoCadastroChaveiro = useRef(null);
   const conexãoAtual = useRef(null);
@@ -273,6 +275,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       return () => {
         componenteAtivo.current = false;
         if (temporizador.current) clearTimeout(temporizador.current);
+        if (temporizadorReinicioBusca.current) clearTimeout(temporizadorReinicioBusca.current);
         if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
         try { novoGerente.stopDeviceScan(); } catch (falha) {}
         inscriçãoDesconexão.current?.remove();
@@ -291,9 +294,14 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
   }, []);
 
   function pararBusca() {
+    buscaEmAndamento.current = false;
     if (temporizador.current) {
       clearTimeout(temporizador.current);
       temporizador.current = null;
+    }
+    if (temporizadorReinicioBusca.current) {
+      clearTimeout(temporizadorReinicioBusca.current);
+      temporizadorReinicioBusca.current = null;
     }
     try {
       const resultado = gerente.current?.stopDeviceScan();
@@ -352,43 +360,76 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       return;
     }
 
+    if (buscaEmAndamento.current) return;
+    buscaEmAndamento.current = true;
     setErro('');
     setDispositivos([]);
     escolherDispositivo(null);
 
     try {
       const autorizado = await pedirPermissões();
-      if (!autorizado) return;
+      if (!autorizado) {
+        buscaEmAndamento.current = false;
+        return;
+      }
 
+      // Encerra qualquer busca anterior do gerenciador compartilhado e dá
+      // tempo para o Android liberar o scanner antes de iniciar outra.
+      try { await gerente.current.stopDeviceScan(); } catch (falha) {}
+      await new Promise((resolver) => setTimeout(resolver, 500));
       const estado = await gerente.current.state();
       setEstadoBluetooth(estado);
       if (estado !== 'PoweredOn') {
         setErro(estado === 'PoweredOff'
           ? 'Ative o Bluetooth do celular e toque em “Buscar dispositivos” novamente.'
           : 'O Bluetooth ainda não está pronto. Confira se está disponível e tente de novo.');
+        buscaEmAndamento.current = false;
         return;
       }
 
       setProcurando(true);
-      await gerente.current.startDeviceScan(null, { allowDuplicates: false }, (falha, dispositivo) => {
-        if (falha) {
-          setErro('A busca foi interrompida: ' + falha.message);
-          pararBusca();
-          return;
-        }
-        if (!dispositivo?.id) return;
-        const achado = {
-          id: dispositivo.id,
-          nome: dispositivo.name || dispositivo.localName || 'Dispositivo Bluetooth sem nome',
-          sinal: dispositivo.rssi,
+      const iniciarScanner = (tentativa = 0) => {
+        if (!buscaEmAndamento.current || !gerente.current) return;
+        const receberResultado = (falha, dispositivo) => {
+          if (falha) {
+            if (tentativa === 0 && /scan|scanning|scanner/i.test(falha.message || '')) {
+              try { gerente.current?.stopDeviceScan(); } catch (ignorada) {}
+              setErro('O Android não iniciou a busca. Vou reiniciar o scanner e tentar mais uma vez…');
+              temporizadorReinicioBusca.current = setTimeout(() => iniciarScanner(1), 800);
+              return;
+            }
+            setErro('A busca foi interrompida. Confirme se o Bluetooth e a Localização estão ligados e tente novamente.');
+            pararBusca();
+            return;
+          }
+          if (!dispositivo?.id) return;
+          setErro('');
+          const achado = {
+            id: dispositivo.id,
+            nome: dispositivo.name || dispositivo.localName || 'Dispositivo Bluetooth sem nome',
+            sinal: dispositivo.rssi,
+          };
+          setDispositivos((atuais) => {
+            const semDuplicados = atuais.filter((item) => item.id !== achado.id);
+            return [...semDuplicados, achado].sort((a, b) => (b.sinal ?? -100) - (a.sinal ?? -100));
+          });
         };
-        setDispositivos((atuais) => {
-          const semDuplicados = atuais.filter((item) => item.id !== achado.id);
-          return [...semDuplicados, achado].sort((a, b) => (b.sinal ?? -100) - (a.sinal ?? -100));
-        });
-      });
+        try {
+          gerente.current.startDeviceScan(null, { allowDuplicates: false }, receberResultado);
+        } catch (falha) {
+          if (tentativa === 0 && /scan|scanning|scanner/i.test(falha?.message || '')) {
+            try { gerente.current?.stopDeviceScan(); } catch (ignorada) {}
+            temporizadorReinicioBusca.current = setTimeout(() => iniciarScanner(1), 800);
+          } else {
+            setErro('O Android não conseguiu iniciar a busca. Feche outras telas que usam Bluetooth e tente novamente.');
+            pararBusca();
+          }
+        }
+      };
+      iniciarScanner();
       temporizador.current = setTimeout(pararBusca, 15000);
     } catch (falha) {
+      buscaEmAndamento.current = false;
       const detalhe = String(falha?.message || '').toLowerCase();
       setErro(detalhe.includes('permission') || detalhe.includes('unauthorized')
         ? 'O Android bloqueou a busca. Permita Bluetooth e, em aparelhos antigos, Localização; depois tente novamente.'
