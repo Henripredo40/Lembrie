@@ -19,7 +19,7 @@ function codificarBase64(bytes: number[]) {
 export function criarPacotesResumoLambrie(resumo: ResumoSaidaBluetooth, tamanhoPacote = 18) {
   return criarPacotesMensagemLambrie({
     destination: resumo.destination || 'Saida',
-    items: resumo.items.join(', ') || 'Todos os essenciais conferidos',
+    items: resumo.items.join(', ') || 'Nenhum item pendente',
   }, tamanhoPacote);
 }
 

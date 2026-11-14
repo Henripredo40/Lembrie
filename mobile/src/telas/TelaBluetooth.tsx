@@ -2,6 +2,7 @@ import estilos from '../estilos/TelaBluetooth.estilos';
 import { useEffect, useRef, useState } from 'react';
 import { PermissionsAndroid, Platform, Pressable, ScrollView, Text, TextInput, View, type Permission } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import CartaoObjeto from '../componentes/CartaoObjeto';
 import { Aviso, Botao, EstadoVazio, TituloSecao } from '../componentes/Elementos';
 import { cores } from '../tema';
@@ -48,6 +49,22 @@ async function enviarComandoLambrie(dispositivo, comando) {
   for (const pacote of criarPacotesComandoLambrie(comando)) {
     await dispositivo.writeCharacteristicWithResponseForService(SERVIÇO_LEMBRIE, CARACTERÍSTICA_LEMBRIE, pacote);
   }
+}
+
+export async function enviarResumoPerimetroParaLambrie(resumo) {
+  const gerente = gerenteBluetoothCompartilhado;
+  const conexão = conexãoLambrieCompartilhada;
+  if (!gerente || !conexão) return false;
+  const dispositivo = (await gerente.devices([conexão.id]))[0] || await gerente.connectToDevice(conexão.id, { timeout: 5000 });
+  await dispositivo.discoverAllServicesAndCharacteristics();
+  for (const pacote of criarPacotesResumoLambrie(resumo)) {
+    await dispositivo.writeCharacteristicWithoutResponseForService(
+      SERVIÇO_LEMBRIE,
+      CARACTERÍSTICA_LEMBRIE,
+      pacote,
+    );
+  }
+  return true;
 }
 
 function aguardar(ms) {
@@ -297,7 +314,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       if (componenteAtivo.current) {
         setDiagnostico(null);
         definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(objetoId) ? { ...item, connected: false } : item));
-        setErro('A conexão do chaveiro foi perdida. Se o buzzer estiver instalado, ele emitirá o alerta. Aproxime o dispositivo e toque em “Localizar chaveiro” para reconectar.');
+        setErro('A conexão Bluetooth foi perdida. Aproxime a placa e conecte novamente; o acionamento do buzzer está em preparação.');
       }
       api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: false }) }).catch(() => {});
     });
@@ -305,13 +322,20 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
 
   async function pedirPermissões() {
     if (Platform.OS !== 'android') return true;
+    if (Number(Platform.Version) < 31) {
+      const serviçosDeLocalizaçãoAtivos = await Location.hasServicesEnabledAsync().catch(() => true);
+      if (!serviçosDeLocalizaçãoAtivos) {
+        setErro('Ative a Localização/GPS do celular para procurar dispositivos Bluetooth neste Android.');
+        return false;
+      }
+    }
     const necessárias: Permission[] = Number(Platform.Version) >= 31
       ? ['android.permission.BLUETOOTH_SCAN', 'android.permission.BLUETOOTH_CONNECT']
       : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
     const resultados = await PermissionsAndroid.requestMultiple(necessárias);
     const recusadas = necessárias.filter((permissão) => resultados[permissão] !== PermissionsAndroid.RESULTS.GRANTED);
     if (recusadas.length) {
-      setErro('Permita o acesso ao Bluetooth nas configurações do Android para procurar o chaveiro.');
+      setErro('Permita Bluetooth e Localização nas configurações do Android e tente buscar novamente.');
       return false;
     }
     return true;
@@ -365,7 +389,10 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       });
       temporizador.current = setTimeout(pararBusca, 15000);
     } catch (falha) {
-      setErro('Não foi possível buscar dispositivos. Verifique o Bluetooth e tente novamente.');
+      const detalhe = String(falha?.message || '').toLowerCase();
+      setErro(detalhe.includes('permission') || detalhe.includes('unauthorized')
+        ? 'O Android bloqueou a busca. Permita Bluetooth e, em aparelhos antigos, Localização; depois tente novamente.'
+        : 'Não foi possível iniciar a busca. Confirme que o Bluetooth do celular está ligado e tente novamente.');
       pararBusca();
     }
   }
@@ -699,7 +726,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
                 <View key={String(objeto.id)} style={estilos.itemAssociado}>
                   <CartaoObjeto objeto={objeto} compacto />
                   {objeto.connected ? <Text style={estilos.statusConectado}>Bluetooth conectado</Text> : <Text style={estilos.statusDesconectado}>Bluetooth desconectado</Text>}
-                  <Botao título={localizando ? 'Conectando para localizar...' : 'Localizar chaveiro'} ícone="volume-high-outline" aoPressionar={() => localizarChaveiro(objeto)} carregando={localizando} estilo={{ marginTop: 10 }} />
+                  <Botao título={localizando ? 'Preparando...' : 'Tocar buzzer (em preparação)'} ícone="volume-high-outline" aoPressionar={() => localizarChaveiro(objeto)} carregando={localizando} desativado estilo={{ marginTop: 10 }} />
                   {objeto.connected ? <Pressable accessibilityRole="button" onPress={() => desconectarDispositivo(objeto)} style={estilos.removerVinculo}><Ionicons name="bluetooth-outline" size={16} color={cores.primario} /><Text style={[estilos.textoRemoverVinculo, { color: cores.primario }]}>Desconectar</Text></Pressable> : null}
                   <Pressable accessibilityRole="button" onPress={() => removerAssociacao(objeto)} style={estilos.removerVinculo}><Ionicons name="unlink-outline" size={16} color={cores.vermelho} /><Text style={estilos.textoRemoverVinculo}>Desassociar dispositivo</Text></Pressable>
                 </View>
