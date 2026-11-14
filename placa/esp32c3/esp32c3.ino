@@ -571,11 +571,9 @@ void handleButtons() {
     pendingK1 = false;
     if (screenIsMenu) return;
     if (showingOverview) {
-      if (itemCount) {
-        itemPage = 0;
-        currentItem = 0;
-        drawChecklist();
-      }
+      itemPage = 0;
+      currentItem = 0;
+      drawChecklist();
     } else if (itemCount) {
       const size_t pageCount = showingDepartureAlert ? getAlertPageCount() : getItemPageCount();
       if (itemPage + 1 < pageCount) itemPage++;
