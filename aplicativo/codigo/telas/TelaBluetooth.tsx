@@ -1,5 +1,6 @@
 import estilos from '../estilos/TelaBluetooth.estilos';
 import { useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PermissionsAndroid, Platform, Pressable, ScrollView, Text, TextInput, View, type Permission } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -14,6 +15,7 @@ const SERVIÇO_LEMBRIE = '6f6d0001-7a52-4f6c-9a21-4c454d425249';
 const CARACTERÍSTICA_LEMBRIE = '6f6d0002-7a52-4f6c-9a21-4c454d425249';
 const CARACTERISTICA_EVENTOS = '6f6d0003-7a52-4f6c-9a21-4c454d425249';
 const ALFABETO_BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+const CHAVE_CHAVEIRO_BLUETOOTH = '@lembre/chaveiro-bluetooth';
 
 function detalharErroBluetooth(mensagem, erro) {
   const codigo = erro?.errorCode ?? erro?.code;
@@ -367,10 +369,6 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
 
   async function iniciarBusca() {
     if (Platform.OS === 'web') return;
-    if (!objetos.length) {
-      setErro('Cadastre primeiro o objeto que receberá o chaveiro.');
-      return;
-    }
     if (!gerente.current) {
       setErro('O Bluetooth não está disponível nesta instalação do aplicativo.');
       return;
@@ -407,6 +405,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       const iniciarScanner = (tentativa = 0) => {
         if (!buscaEmAndamento.current || !gerente.current) return;
         const receberResultado = (falha, dispositivo) => {
+          if (!buscaEmAndamento.current) return;
           if (falha) {
             if (tentativa === 0 && /scan|scanning|scanner/i.test(falha.message || '')) {
               try { gerente.current?.stopDeviceScan(); } catch (ignorada) {}
@@ -414,7 +413,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
               temporizadorReinicioBusca.current = setTimeout(() => iniciarScanner(1), 800);
               return;
             }
-            setErro(detalharErroBluetooth('A busca foi interrompida. Confira as permissões de Dispositivos próximos.', falha));
+            setErro('A busca parou. Confira se o Bluetooth está ligado e se o app pode encontrar dispositivos próximos.');
             pararBusca();
             return;
           }
@@ -448,17 +447,15 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       buscaEmAndamento.current = false;
       const detalhe = String(falha?.message || '').toLowerCase();
       const mensagem = detalhe.includes('permission') || detalhe.includes('unauthorized')
-        ? 'O Android bloqueou a busca. Permita Bluetooth e, em aparelhos antigos, Localização.'
-        : 'Não foi possível iniciar a busca. Confira o Bluetooth do celular.';
-      setErro(detalharErroBluetooth(mensagem, falha));
+        ? 'O celular não permitiu a busca. Autorize “Dispositivos próximos” para o Lembriê nas configurações do app.'
+        : 'Não consegui começar a busca. Ligue o Bluetooth e tente novamente.';
+      setErro(mensagem);
       pararBusca();
     }
   }
 
   async function associarDispositivo() {
-    if (!dispositivoEscolhido || !objetoEscolhido) return;
-    const objeto = objetos.find((item) => String(item.id) === String(objetoEscolhido));
-    if (!objeto) return;
+    if (!dispositivoEscolhido) return;
     setVinculando(true);
     setConectando(true);
     setErro('');
@@ -469,6 +466,9 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
       await conectado.discoverAllServicesAndCharacteristics();
       acompanharPedidoCadastro(conectado);
       const serviços = await conectado.services();
+      if (!serviços.some((serviço) => serviço.uuid.toLowerCase() === SERVIÇO_LEMBRIE.toLowerCase())) {
+        throw new Error('Esse não parece ser o chaveiro Lembriê. Escolha “Lambrie ESP32C3” na lista.');
+      }
       const listaServiços = await Promise.all(serviços.map(async (serviço) => {
         const características = await conectado.characteristicsForService(serviço.uuid);
         return {
@@ -481,11 +481,8 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
           })),
         };
       }));
-      await api('/objects/' + objeto.id, {
-        method: 'PATCH',
-        body: JSON.stringify({ ble_uuid: dispositivoEscolhido.id }),
-      });
-      conexãoAtual.current = { id: dispositivoEscolhido.id, objetoId: objeto.id };
+      await AsyncStorage.setItem(CHAVE_CHAVEIRO_BLUETOOTH, dispositivoEscolhido.id);
+      conexãoAtual.current = { id: dispositivoEscolhido.id, objetoId: null };
       conexãoLambrieCompartilhada = conexãoAtual.current;
       setDiagnostico({ nome: dispositivoEscolhido.nome, serviços: listaServiços });
       await api('/devices/heartbeat', {
@@ -493,7 +490,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
         body: JSON.stringify({ ble_uuid: dispositivoEscolhido.id, connected: true, rssi: dispositivoEscolhido.sinal }),
       });
       await enviarComandoLambrie(conectado, 'arm');
-      await acompanharDesconexão(dispositivoEscolhido.id, objeto.id);
+      await acompanharDesconexão(dispositivoEscolhido.id, null);
       if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
       temporizadorSinal.current = setInterval(async () => {
         try {
@@ -506,11 +503,8 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
           // A conexão pode cair entre a leitura do sinal e o envio do heartbeat.
         }
       }, 20000);
-      definirObjetos((atuais) => atuais.map((item) => String(item.id) === String(objeto.id)
-        ? { ...item, ble_uuid: dispositivoEscolhido.id, connected: true, last_rssi: dispositivoEscolhido.sinal }
-        : item));
       escolherDispositivo(null);
-      notificar('Dispositivo conectado e associado a “' + objeto.name + '”. Os serviços e recursos Bluetooth foram identificados.');
+      notificar('Chaveiro conectado. Agora você pode enviar sua lista para a tela.');
     } catch (falha) {
       if (dispositivoEscolhido?.id && gerente.current) {
         const dispositivo = (await gerente.current.devices([dispositivoEscolhido.id]).catch(() => []))[0];
@@ -520,7 +514,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
         }
         gerente.current.cancelDeviceConnection(dispositivoEscolhido.id).catch(() => {});
       }
-      setErro(falha.message || 'Não foi possível associar esse dispositivo.');
+      setErro(falha.message || 'Não consegui conectar à placa. Mantenha-a perto do celular e tente novamente.');
     } finally {
       setVinculando(false);
       setConectando(false);
@@ -638,6 +632,33 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     }
   }
 
+  async function desconectarChaveiro() {
+    const id = conexãoAtual.current?.id;
+    if (!id || !gerente.current) return;
+    try {
+      const dispositivo = (await gerente.current.devices([id]))[0];
+      if (dispositivo) {
+        await dispositivo.discoverAllServicesAndCharacteristics();
+        await enviarComandoLambrie(dispositivo, 'disarm').catch(() => {});
+      }
+      inscriçãoDesconexão.current?.remove();
+      inscriçãoDesconexão.current = null;
+      inscriçãoEventosLambrie?.remove();
+      inscriçãoEventosLambrie = null;
+      if (temporizadorSinal.current) clearInterval(temporizadorSinal.current);
+      temporizadorSinal.current = null;
+      await gerente.current.cancelDeviceConnection(id).catch(() => {});
+      await AsyncStorage.removeItem(CHAVE_CHAVEIRO_BLUETOOTH);
+      await api('/devices/heartbeat', { method: 'POST', body: JSON.stringify({ ble_uuid: id, connected: false }) }).catch(() => {});
+      conexãoAtual.current = null;
+      conexãoLambrieCompartilhada = null;
+      setDiagnostico(null);
+      notificar('Chaveiro desconectado.');
+    } catch (falha) {
+      setErro('Não consegui desconectar a placa agora. Tente novamente.');
+    }
+  }
+
   async function removerAssociacao(objeto) {
     try {
       await api('/objects/' + objeto.id, {
@@ -676,7 +697,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
     <ScrollView style={estilos.tela} contentContainerStyle={estilos.conteudo}>
       <Text style={estilos.sobretitulo}>CHAVEIRO</Text>
       <Text style={estilos.titulo}>Bluetooth</Text>
-      <Text style={estilos.subtitulo}>O app avisa quando a conexão Bluetooth cai. O buzzer da placa está desativado por enquanto.</Text>
+      <Text style={estilos.subtitulo}>Encontre e conecte sua placa por perto.</Text>
 
       {Platform.OS === 'web' ? (
         <EstadoVazio ícone="phone-portrait-outline" título="Use o aplicativo Android para buscar" texto="A busca Bluetooth precisa das permissões nativas do celular. No site, você pode organizar os objetos; para encontrar dispositivos, use o APK Android." />
@@ -691,54 +712,36 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
             <View style={[estilos.pontoEstado, estadoBluetooth === 'PoweredOn' && estilos.pontoLigado]} />
           </View>
 
-          <View style={estilos.cartaoAviso}>
-            <View style={estilos.cabecalhoAviso}><Ionicons name="construct-outline" size={19} color={cores.primario} /><Text style={estilos.tituloAviso}>Como conectar</Text></View>
-            <Text style={estilos.textoAviso}>Sem chaveiro, você ainda pode organizar objetos e conferir sua lista manualmente. Os sons precisam de um buzzer externo instalado na ESP32-C3; veja as instruções do firmware.</Text>
+          <View style={estilos.cartaoBusca}>
+            <Text style={estilos.tituloBusca}>Conectar ao chaveiro</Text>
+            <Text style={estilos.textoBusca}>Ligue a placa e deixe-a perto do celular. Toque em buscar e escolha “Lambrie ESP32C3” nos resultados.</Text>
+            <Text style={estilos.textoBusca}>A placa pode não aparecer na lista Bluetooth das configurações do celular. Procure por ela aqui no app.</Text>
+            <Botao título={procurando ? 'Procurando dispositivos...' : 'Buscar dispositivos próximos'} ícone="bluetooth-outline" aoPressionar={procurando ? pararBusca : iniciarBusca} carregando={false} estilo={estilos.botaoBusca} />
+            {procurando ? <Text style={estilos.tempoBusca}>Procurando por até 15 segundos. Mantenha a placa perto do celular.</Text> : null}
           </View>
-
-          {objetos.length ? (
-            <View style={estilos.cartaoBusca}>
-              <Text style={estilos.tituloBusca}>Associar a qual objeto?</Text>
-              <Text style={estilos.textoBusca}>Escolha o objeto que receberá o chaveiro. O app vai procurar dispositivos Bluetooth próximos.</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.listaObjetos}>
-                {objetos.map((objeto) => (
-                  <Pressable key={String(objeto.id)} accessibilityRole="button" onPress={() => escolherObjeto(String(objeto.id))} style={[estilos.opcaoObjeto, String(objeto.id) === String(objetoEscolhido) && estilos.opcaoObjetoAtiva]}>
-                    <Text numberOfLines={1} style={[estilos.nomeOpcao, String(objeto.id) === String(objetoEscolhido) && estilos.nomeOpcaoAtiva]}>{objeto.name}</Text>
-                    {objetoTemChaveiro(objeto) ? <Text style={estilos.associadoPequeno}>Associado</Text> : null}
-                  </Pressable>
-                ))}
-              </ScrollView>
-              <Botao título={procurando ? 'Procurando chaveiro...' : 'Buscar meu chaveiro'} ícone="bluetooth-outline" aoPressionar={procurando ? pararBusca : iniciarBusca} carregando={false} estilo={estilos.botaoBusca} />
-              {procurando ? <Text style={estilos.tempoBusca}>Busca ativa por até 15 segundos. Mantenha o dispositivo por perto.</Text> : null}
-            </View>
-          ) : (
-            <EstadoVazio ícone="cube-outline" título="Adicione um objeto primeiro" texto="Depois você poderá escolher qual objeto será associado ao chaveiro." ação="Ir para meus objetos" aoPressionar={abrirObjetos} />
-          )}
 
           {erro ? <Aviso ícone="alert-circle-outline" tom="alerta" texto={erro} /> : null}
 
           {dispositivos.length > 0 ? (
             <View style={estilos.resultados}>
               <TituloSecao título={'DISPOSITIVOS PRÓXIMOS · ' + dispositivos.length} />
-              <Text style={estilos.lembreteSelecao}>Selecione apenas o seu chaveiro. Outros acessórios Bluetooth também podem aparecer.</Text>
+              <Text style={estilos.lembreteSelecao}>Escolha “Lambrie ESP32C3” para conectar sua placa.</Text>
               {dispositivos.map((dispositivo) => {
                 const ativo = dispositivoEscolhido?.id === dispositivo.id;
-                const jáAssociado = objetos.some((objeto) => objeto.ble_uuid === dispositivo.id);
                 return (
                   <Pressable key={dispositivo.id} accessibilityRole="button" onPress={() => escolherDispositivo(dispositivo)} style={[estilos.dispositivo, ativo && estilos.dispositivoAtivo]}>
                     <View style={estilos.iconeDispositivo}><MaterialCommunityIcons name="bluetooth-connect" size={20} color={ativo ? cores.primario : cores.textoSuave} /></View>
                     <View style={{ flex: 1 }}><Text style={estilos.nomeDispositivo} numberOfLines={1}>{dispositivo.nome}</Text><Text style={estilos.idDispositivo}>{dispositivo.id.slice(0, 8)}{dispositivo.id.length > 8 ? '…' : ''}{dispositivo.sinal != null ? ' · sinal ' + dispositivo.sinal + ' dBm' : ''}</Text></View>
-                    {jáAssociado ? <Text style={estilos.textoAssociado}>Em uso</Text> : ativo ? <Ionicons name="checkmark-circle" size={22} color={cores.primario} /> : null}
+                    {ativo ? <Ionicons name="checkmark-circle" size={22} color={cores.primario} /> : null}
                   </Pressable>
                 );
               })}
-              <Botao título={conectando ? 'Conectando ao chaveiro...' : 'Conectar chaveiro a ' + (objetoSelecionado?.name || 'objeto')} ícone="bluetooth-connect" aoPressionar={associarDispositivo} carregando={vinculando} desativado={!dispositivoEscolhido || !objetoEscolhido} estilo={{ marginTop: 11 }} />
+              <Botao título={conectando ? 'Conectando...' : 'Conectar à placa'} ícone="bluetooth-connect" aoPressionar={associarDispositivo} carregando={vinculando} desativado={!dispositivoEscolhido} estilo={{ marginTop: 11 }} />
             </View>
           ) : !procurando ? (
             <View style={estilos.semResultados}><Ionicons name="radio-outline" size={22} color={cores.textoSuave} /><Text style={estilos.textoSemResultados}>Os dispositivos encontrados aparecerão aqui.</Text></View>
           ) : null}
 
-          <TituloSecao título={'OBJETOS ASSOCIADOS · ' + associados.length} />
           {cadastroSolicitado ? (
             <View style={estilos.cartaoCadastroChaveiro}>
               <Text style={estilos.tituloBusca}>Cadastro pedido pelo chaveiro</Text>
@@ -762,6 +765,7 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
             <View style={estilos.cartaoDiagnostico}>
               <Text style={estilos.tituloBusca}>Conectado: {diagnostico.nome}</Text>
               <Text style={estilos.textoBusca}>Serviços encontrados: {diagnostico.serviços.length}</Text>
+              <Botao título="Desconectar placa" ícone="bluetooth-outline" secundário aoPressionar={desconectarChaveiro} estilo={{ marginTop: 10 }} />
               <Botao título={enviandoResumo ? 'Enviando resumo...' : 'Enviar resumo da saída para a tela'} ícone="paper-plane-outline" aoPressionar={enviarResumoParaTela} carregando={enviandoResumo} estilo={{ marginTop: 12 }} />
               {diagnostico.serviços.map((serviço) => (
                 <View key={serviço.uuid} style={estilos.linhaServico}>
@@ -779,21 +783,6 @@ export default function TelaBluetooth({ objetos, definirObjetos, api, notificar,
               ))}
             </View>
           ) : null}
-          {associados.length ? (
-            <View style={estilos.listaAssociados}>
-              {associados.map((objeto) => (
-                <View key={String(objeto.id)} style={estilos.itemAssociado}>
-                  <CartaoObjeto objeto={objeto} compacto />
-                  {objeto.connected ? <Text style={estilos.statusConectado}>Bluetooth conectado</Text> : <Text style={estilos.statusDesconectado}>Bluetooth desconectado</Text>}
-                  <Botao título={localizando ? 'Preparando...' : 'Tocar buzzer (em preparação)'} ícone="volume-high-outline" aoPressionar={() => localizarChaveiro(objeto)} carregando={localizando} desativado estilo={{ marginTop: 10 }} />
-                  {objeto.connected ? <Pressable accessibilityRole="button" onPress={() => desconectarDispositivo(objeto)} style={estilos.removerVinculo}><Ionicons name="bluetooth-outline" size={16} color={cores.primario} /><Text style={[estilos.textoRemoverVinculo, { color: cores.primario }]}>Desconectar</Text></Pressable> : null}
-                  <Pressable accessibilityRole="button" onPress={() => removerAssociacao(objeto)} style={estilos.removerVinculo}><Ionicons name="unlink-outline" size={16} color={cores.vermelho} /><Text style={estilos.textoRemoverVinculo}>Desassociar dispositivo</Text></Pressable>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <Text style={estilos.nenhumAssociado}>Para habilitar a detecção por proximidade, associe um chaveiro Bluetooth compatível. A lista de objetos continua disponível sem ele.</Text>
-          )}
         </>
       )}
       <View style={{ height: 24 }} />
